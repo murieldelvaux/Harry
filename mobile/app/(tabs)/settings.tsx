@@ -541,12 +541,18 @@ export default function ProfileScreen() {
                     styles.toggleSwitch,
                     {
                       backgroundColor: isSharingPrivate ? theme.primary : (isDark ? '#334155' : '#CBD5E1'),
-                      justifyContent: isSharingPrivate ? 'flex-end' : 'flex-start',
                     },
                   ]}
                   activeOpacity={0.8}
                 >
-                  <View style={[styles.toggleKnob, isSharingPrivate && { backgroundColor: '#FFFFFF' }]} />
+                  <View
+                    style={[
+                      styles.toggleKnob,
+                      isSharingPrivate
+                        ? { alignSelf: 'flex-end', backgroundColor: '#FFFFFF' }
+                        : { alignSelf: 'flex-start', backgroundColor: '#94A3B8' },
+                    ]}
+                  />
                 </TouchableOpacity>
               </View>
 
