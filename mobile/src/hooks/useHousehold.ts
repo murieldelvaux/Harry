@@ -7,6 +7,7 @@ import {
   HouseholdDetailDto,
   CreateHouseholdDto,
   JoinHouseholdDto,
+  UpdateHouseholdDto,
 } from '../../../packages/shared/src';
 
 export function useHousehold() {
@@ -48,6 +49,42 @@ export function useHousehold() {
     },
   });
 
+  const updateHouseholdMutation = useMutation({
+    mutationFn: async (dto: UpdateHouseholdDto) => {
+      const { data } = await apiClient.put<HouseholdDetailDto>('/household/current', dto);
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.household.current, data);
+      queryClient.invalidateQueries({ queryKey: queryKeys.household.current });
+      queryClient.invalidateQueries({ queryKey: queryKeys.auth.me });
+    },
+  });
+
+  const deleteHouseholdMutation = useMutation({
+    mutationFn: async () => {
+      const { data } = await apiClient.delete('/household/current');
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.setQueryData(queryKeys.household.current, null);
+      queryClient.invalidateQueries({ queryKey: queryKeys.household.current });
+      queryClient.invalidateQueries({ queryKey: queryKeys.auth.me });
+    },
+  });
+
+  const leaveHouseholdMutation = useMutation({
+    mutationFn: async () => {
+      const { data } = await apiClient.post('/household/leave');
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.setQueryData(queryKeys.household.current, null);
+      queryClient.invalidateQueries({ queryKey: queryKeys.household.current });
+      queryClient.invalidateQueries({ queryKey: queryKeys.auth.me });
+    },
+  });
+
   return {
     household: householdQuery.data,
     isLoading: householdQuery.isLoading,
@@ -59,6 +96,12 @@ export function useHousehold() {
     joinHousehold: joinHouseholdMutation.mutateAsync,
     isJoining: joinHouseholdMutation.isPending,
     joinError: joinHouseholdMutation.error,
+    updateHousehold: updateHouseholdMutation.mutateAsync,
+    isUpdating: updateHouseholdMutation.isPending,
+    deleteHousehold: deleteHouseholdMutation.mutateAsync,
+    isDeleting: deleteHouseholdMutation.isPending,
+    leaveHousehold: leaveHouseholdMutation.mutateAsync,
+    isLeaving: leaveHouseholdMutation.isPending,
     refetch: householdQuery.refetch,
   };
 }

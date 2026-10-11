@@ -75,6 +75,11 @@ export const JoinHouseholdDtoSchema = z.object({
 });
 export type JoinHouseholdDto = z.infer<typeof JoinHouseholdDtoSchema>;
 
+export const UpdateHouseholdDtoSchema = z.object({
+  name: z.string().min(1, 'Nome do espaço não pode ficar vazio'),
+});
+export type UpdateHouseholdDto = z.infer<typeof UpdateHouseholdDtoSchema>;
+
 export interface HouseholdDetailDto {
   id: string;
   name: string;

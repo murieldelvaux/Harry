@@ -35,7 +35,17 @@ const AVATAR_PRESETS = [
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, updateProfile, isUpdatingProfile, updatePhone, isUpdatingPhone } = useAuth();
-  const { household, joinHousehold, isJoining } = useHousehold();
+  const {
+    household,
+    joinHousehold,
+    isJoining,
+    updateHousehold,
+    isUpdating: isUpdatingHousehold,
+    deleteHousehold,
+    isDeleting: isDeletingHousehold,
+    leaveHousehold,
+    isLeaving: isLeavingHousehold,
+  } = useHousehold();
   const { theme, isDark, toggleTheme } = useTheme();
 
   // Estados de Edição de Foto
@@ -45,6 +55,10 @@ export default function ProfileScreen() {
   // Estados de Edição de Nome
   const [nameModalVisible, setNameModalVisible] = useState(false);
   const [newName, setNewName] = useState(user?.name || '');
+
+  // Estados de Edição do Espaço Compartilhado
+  const [householdModalVisible, setHouseholdModalVisible] = useState(false);
+  const [newHouseholdName, setNewHouseholdName] = useState('');
 
   // Estados de Convite e Telefone
   const [inviteCode, setInviteCode] = useState('');
@@ -117,6 +131,50 @@ export default function ProfileScreen() {
     } catch {
       showMessage('Erro', 'Não foi possível salvar o número.');
     }
+  };
+
+  const handleSaveHouseholdName = async () => {
+    if (!newHouseholdName.trim()) {
+      showMessage('Atenção', 'Informe o nome do espaço.');
+      return;
+    }
+    try {
+      await updateHousehold({ name: newHouseholdName.trim() });
+      setHouseholdModalVisible(false);
+      showMessage('Sucesso', 'Nome do espaço atualizado!');
+    } catch {
+      showMessage('Erro', 'Não foi possível atualizar o nome do espaço.');
+    }
+  };
+
+  const handleLeaveHousehold = () => {
+    showConfirm(
+      'Sair do espaço compartilhado?',
+      'Você deixará este grupo e sua conta voltará para o modo individual. Seus registros privados continuarão salvos.',
+      async () => {
+        try {
+          await leaveHousehold();
+          showMessage('Pronto', 'Você saiu do espaço compartilhado.');
+        } catch {
+          showMessage('Erro', 'Não foi possível sair do espaço.');
+        }
+      }
+    );
+  };
+
+  const handleDeleteHousehold = () => {
+    showConfirm(
+      'Excluir espaço compartilhado?',
+      'Tem certeza? Esta ação dissolverá o grupo e desvinculará todos os membros conectados, voltando todos ao modo individual.',
+      async () => {
+        try {
+          await deleteHousehold();
+          showMessage('Sucesso', 'Espaço compartilhado excluído com sucesso.');
+        } catch {
+          showMessage('Erro', 'Não foi possível excluir o espaço.');
+        }
+      }
+    );
   };
 
   const handleShareInvite = async () => {
@@ -399,9 +457,23 @@ export default function ProfileScreen() {
 
           {household ? (
             <View style={{ marginTop: 14 }}>
-              <Text style={[styles.householdTitle, { color: theme.textPrimary }]}>
-                {household.name}
-              </Text>
+              <View style={styles.householdHeaderRow}>
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                  <Text style={[styles.householdTitle, { color: theme.textPrimary }]}>
+                    {household.name}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    setNewHouseholdName(household.name);
+                    setHouseholdModalVisible(true);
+                  }}
+                  style={[styles.editHouseholdBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}
+                  activeOpacity={0.7}
+                >
+                  <Text style={{ fontSize: 13, color: theme.textPrimary, fontWeight: '600' }}>✏️ Editar</Text>
+                </TouchableOpacity>
+              </View>
 
               {/* Box de Código de Convite */}
               <View style={[styles.inviteBox, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
@@ -445,6 +517,31 @@ export default function ProfileScreen() {
                   </View>
                 </View>
               ))}
+
+              {/* Ações de Gestão do Espaço */}
+              <View style={styles.householdActionsRow}>
+                <TouchableOpacity
+                  style={[styles.dangerOutlineBtn, { borderColor: isDark ? 'rgba(239, 68, 68, 0.4)' : '#FCA5A5' }]}
+                  onPress={handleLeaveHousehold}
+                  disabled={isLeavingHousehold}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.dangerOutlineBtnText}>
+                    {isLeavingHousehold ? 'Saindo...' : '🚪 Sair do Espaço'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.dangerSolidBtn, { backgroundColor: '#EF4444' }]}
+                  onPress={handleDeleteHousehold}
+                  disabled={isDeletingHousehold}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.dangerSolidBtnText}>
+                    {isDeletingHousehold ? 'Excluindo...' : '🗑️ Excluir Espaço'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ) : (
             <View style={{ marginTop: 14 }}>
@@ -665,6 +762,38 @@ export default function ProfileScreen() {
                 title="Salvar"
                 onPress={handleSaveName}
                 isLoading={isUpdatingProfile}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL EDITAR NOME DO ESPAÇO */}
+      <Modal visible={householdModalVisible} animationType="fade" transparent>
+        <View style={styles.modalOverlayCenter}>
+          <View style={[styles.dialogBox, { backgroundColor: theme.surface, borderColor: theme.border }, theme.cardShadow]}>
+            <Text style={[styles.dialogTitle, { color: theme.textPrimary }]}>Editar Nome do Espaço</Text>
+            <Text style={{ fontSize: 13, color: theme.textSecondary, marginTop: 4 }}>
+              Dê um nome para o seu lar compartilhado (ex: Nossa Casa, Nosso Cantinho)
+            </Text>
+            <Input
+              placeholder="Nome do Espaço"
+              value={newHouseholdName}
+              onChangeText={setNewHouseholdName}
+              containerStyle={{ marginTop: 12, marginBottom: 16 }}
+            />
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Button
+                title="Cancelar"
+                variant="ghost"
+                onPress={() => setHouseholdModalVisible(false)}
+                style={{ flex: 1 }}
+              />
+              <Button
+                title="Salvar"
+                onPress={handleSaveHouseholdName}
+                isLoading={isUpdatingHousehold}
                 style={{ flex: 1 }}
               />
             </View>
@@ -1036,5 +1165,47 @@ const styles = StyleSheet.create({
   },
   periodicOptionText: {
     fontSize: 11,
+  },
+  householdHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  editHouseholdBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  householdActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 18,
+  },
+  dangerOutlineBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dangerOutlineBtnText: {
+    color: '#EF4444',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  dangerSolidBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dangerSolidBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

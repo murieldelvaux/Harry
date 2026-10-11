@@ -4,11 +4,19 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { CreateHouseholdDto, JoinHouseholdDto } from '../../../../packages/shared/src';
+import { RealtimeService } from '../../common/realtime/realtime.service';
+import {
+  CreateHouseholdDto,
+  JoinHouseholdDto,
+  UpdateHouseholdDto,
+} from '../../../../packages/shared/src';
 
 @Injectable()
 export class HouseholdService {
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    private realtimeService: RealtimeService,
+  ) {}
 
   async create(userId: string, dto: CreateHouseholdDto) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -87,5 +95,97 @@ export class HouseholdService {
     }
 
     return user.household;
+  }
+
+  async update(userId: string, dto: UpdateHouseholdDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.householdId) {
+      throw new NotFoundException('Você não pertence a nenhum espaço compartilhado');
+    }
+
+    const updated = await this.prisma.household.update({
+      where: { id: user.householdId },
+      data: {
+        name: dto.name.trim(),
+      },
+      include: {
+        members: {
+          select: { id: true, name: true, email: true, phoneNumber: true, avatarUrl: true },
+        },
+      },
+    });
+
+    this.realtimeService.emit({
+      type: 'REFETCH',
+      householdId: user.householdId,
+      data: { action: 'HOUSEHOLD_UPDATED', household: updated },
+    });
+
+    return updated;
+  }
+
+  async delete(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.householdId) {
+      throw new NotFoundException('Você não pertence a nenhum espaço compartilhado');
+    }
+
+    const householdId = user.householdId;
+
+    // Notificar membros via realtime antes da exclusão
+    this.realtimeService.emit({
+      type: 'REFETCH',
+      householdId,
+      data: { action: 'HOUSEHOLD_DELETED' },
+    });
+
+    // Desconecta todos os membros do espaço
+    await this.prisma.user.updateMany({
+      where: { householdId },
+      data: { householdId: null },
+    });
+
+    // Exclui o espaço e dados em cascata
+    await this.prisma.household.delete({
+      where: { id: householdId },
+    });
+
+    return { success: true, message: 'Espaço compartilhado excluído com sucesso' };
+  }
+
+  async leave(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.householdId) {
+      throw new NotFoundException('Você não pertence a nenhum espaço compartilhado');
+    }
+
+    const householdId = user.householdId;
+
+    // Desconecta o usuário do espaço
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { householdId: null },
+    });
+
+    // Notifica os outros membros do espaço
+    this.realtimeService.emit({
+      type: 'REFETCH',
+      householdId,
+      userId,
+      data: { action: 'MEMBER_LEFT', memberId: userId },
+    });
+
+    // Se não restou ninguém no espaço, exclui o espaço
+    const remainingMembers = await this.prisma.user.count({
+      where: { householdId },
+    });
+
+    if (remainingMembers === 0) {
+      await this.prisma.household.delete({
+        where: { id: householdId },
+      });
+    }
+
+    return { success: true, message: 'Você saiu do espaço compartilhado' };
   }
 }
