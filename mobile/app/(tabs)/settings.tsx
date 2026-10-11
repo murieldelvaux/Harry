@@ -13,7 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useHousehold } from '../../src/hooks/useHousehold';
-import { showConfirm, showMessage } from '../../src/utils/alert';
+import { showMessage } from '../../src/utils/alert';
 import { useTheme } from '../../src/theme/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import { Input } from '../../src/components/Input';
@@ -59,6 +59,14 @@ export default function ProfileScreen() {
   // Estados de Edição do Espaço Compartilhado
   const [householdModalVisible, setHouseholdModalVisible] = useState(false);
   const [newHouseholdName, setNewHouseholdName] = useState('');
+  const [householdEditError, setHouseholdEditError] = useState('');
+
+  // Estados de Sair e Excluir Espaço
+  const [leaveModalVisible, setLeaveModalVisible] = useState(false);
+  const [leaveError, setLeaveError] = useState('');
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [switchModalVisible, setSwitchModalVisible] = useState(false);
 
   // Estados de Convite e Telefone
   const [inviteCode, setInviteCode] = useState('');
@@ -134,47 +142,37 @@ export default function ProfileScreen() {
   };
 
   const handleSaveHouseholdName = async () => {
+    setHouseholdEditError('');
     if (!newHouseholdName.trim()) {
-      showMessage('Atenção', 'Informe o nome do espaço.');
+      setHouseholdEditError('Informe o nome do espaço.');
       return;
     }
     try {
       await updateHousehold({ name: newHouseholdName.trim() });
       setHouseholdModalVisible(false);
-      showMessage('Sucesso', 'Nome do espaço atualizado!');
-    } catch {
-      showMessage('Erro', 'Não foi possível atualizar o nome do espaço.');
+    } catch (err: any) {
+      setHouseholdEditError(err?.response?.data?.message || 'Não foi possível atualizar o nome do espaço.');
     }
   };
 
-  const handleLeaveHousehold = () => {
-    showConfirm(
-      'Sair do espaço compartilhado?',
-      'Você deixará este grupo e sua conta voltará para o modo individual. Seus registros privados continuarão salvos.',
-      async () => {
-        try {
-          await leaveHousehold();
-          showMessage('Pronto', 'Você saiu do espaço compartilhado.');
-        } catch {
-          showMessage('Erro', 'Não foi possível sair do espaço.');
-        }
-      }
-    );
+  const handleConfirmLeave = async () => {
+    setLeaveError('');
+    try {
+      await leaveHousehold();
+      setLeaveModalVisible(false);
+    } catch (err: any) {
+      setLeaveError(err?.response?.data?.message || 'Não foi possível sair do espaço.');
+    }
   };
 
-  const handleDeleteHousehold = () => {
-    showConfirm(
-      'Excluir espaço compartilhado?',
-      'Tem certeza? Esta ação dissolverá o grupo e desvinculará todos os membros conectados, voltando todos ao modo individual.',
-      async () => {
-        try {
-          await deleteHousehold();
-          showMessage('Sucesso', 'Espaço compartilhado excluído com sucesso.');
-        } catch {
-          showMessage('Erro', 'Não foi possível excluir o espaço.');
-        }
-      }
-    );
+  const handleConfirmDelete = async () => {
+    setDeleteError('');
+    try {
+      await deleteHousehold();
+      setDeleteModalVisible(false);
+    } catch (err: any) {
+      setDeleteError(err?.response?.data?.message || 'Não foi possível excluir o espaço.');
+    }
   };
 
   const handleShareInvite = async () => {
@@ -188,30 +186,29 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleJoinWithCode = async () => {
+  const executeJoin = async () => {
+    const code = inviteCode.trim().toUpperCase();
+    try {
+      await joinHousehold({ inviteCode: code });
+      setInviteCode('');
+      setSwitchModalVisible(false);
+    } catch (err: any) {
+      setJoinError(err?.response?.data?.message || 'Código inválido ou expirado.');
+      setSwitchModalVisible(false);
+    }
+  };
+
+  const handleJoinWithCode = () => {
     setJoinError('');
     const code = inviteCode.trim().toUpperCase();
     if (!code) {
       setJoinError('Digite o código de convite.');
       return;
     }
-    const doJoin = async () => {
-      try {
-        await joinHousehold({ inviteCode: code });
-        setInviteCode('');
-        showMessage('Pronto!', 'Você entrou no espaço compartilhado.');
-      } catch (err: any) {
-        setJoinError(err?.response?.data?.message || 'Código inválido ou expirado.');
-      }
-    };
     if (household) {
-      showConfirm(
-        'Trocar de espaço?',
-        'Você sairá do espaço atual e entrará no espaço deste código.',
-        doJoin
-      );
+      setSwitchModalVisible(true);
     } else {
-      doJoin();
+      executeJoin();
     }
   };
 
@@ -522,24 +519,24 @@ export default function ProfileScreen() {
               <View style={styles.householdActionsRow}>
                 <TouchableOpacity
                   style={[styles.dangerOutlineBtn, { borderColor: isDark ? 'rgba(239, 68, 68, 0.4)' : '#FCA5A5' }]}
-                  onPress={handleLeaveHousehold}
-                  disabled={isLeavingHousehold}
+                  onPress={() => {
+                    setLeaveError('');
+                    setLeaveModalVisible(true);
+                  }}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.dangerOutlineBtnText}>
-                    {isLeavingHousehold ? 'Saindo...' : '🚪 Sair do Espaço'}
-                  </Text>
+                  <Text style={styles.dangerOutlineBtnText}>🚪 Sair do Espaço</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={[styles.dangerSolidBtn, { backgroundColor: '#EF4444' }]}
-                  onPress={handleDeleteHousehold}
-                  disabled={isDeletingHousehold}
+                  onPress={() => {
+                    setDeleteError('');
+                    setDeleteModalVisible(true);
+                  }}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.dangerSolidBtnText}>
-                    {isDeletingHousehold ? 'Excluindo...' : '🗑️ Excluir Espaço'}
-                  </Text>
+                  <Text style={styles.dangerSolidBtnText}>🗑️ Excluir Espaço</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -780,7 +777,11 @@ export default function ProfileScreen() {
             <Input
               placeholder="Nome do Espaço"
               value={newHouseholdName}
-              onChangeText={setNewHouseholdName}
+              onChangeText={(t) => {
+                setNewHouseholdName(t);
+                setHouseholdEditError('');
+              }}
+              error={householdEditError || undefined}
               containerStyle={{ marginTop: 12, marginBottom: 16 }}
             />
             <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -794,6 +795,97 @@ export default function ProfileScreen() {
                 title="Salvar"
                 onPress={handleSaveHouseholdName}
                 isLoading={isUpdatingHousehold}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL SAIR DO ESPAÇO */}
+      <Modal visible={leaveModalVisible} animationType="fade" transparent>
+        <View style={styles.modalOverlayCenter}>
+          <View style={[styles.dialogBox, { backgroundColor: theme.surface, borderColor: theme.border }, theme.cardShadow]}>
+            <Text style={[styles.dialogTitle, { color: theme.textPrimary }]}>🚪 Sair do Espaço</Text>
+            <Text style={{ fontSize: 13, color: theme.textSecondary, marginTop: 6, lineHeight: 18 }}>
+              Você sairá deste lar compartilhado e sua conta voltará ao modo individual. Seus registros privados continuarão intactos.
+            </Text>
+            {leaveError ? (
+              <Text style={{ color: '#EF4444', fontSize: 12, marginTop: 10, fontWeight: '600' }}>
+                {leaveError}
+              </Text>
+            ) : null}
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 18 }}>
+              <Button
+                title="Cancelar"
+                variant="ghost"
+                onPress={() => setLeaveModalVisible(false)}
+                style={{ flex: 1 }}
+              />
+              <Button
+                title="Confirmar Saída"
+                variant="danger"
+                onPress={handleConfirmLeave}
+                isLoading={isLeavingHousehold}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL EXCLUIR ESPAÇO */}
+      <Modal visible={deleteModalVisible} animationType="fade" transparent>
+        <View style={styles.modalOverlayCenter}>
+          <View style={[styles.dialogBox, { backgroundColor: theme.surface, borderColor: theme.border }, theme.cardShadow]}>
+            <Text style={[styles.dialogTitle, { color: '#EF4444' }]}>🗑️ Excluir Espaço</Text>
+            <Text style={{ fontSize: 13, color: theme.textSecondary, marginTop: 6, lineHeight: 18 }}>
+              Tem certeza? Esta ação dissolverá o grupo compartilhado e desvinculará todos os membros conectados, voltando ambos ao modo individual.
+            </Text>
+            {deleteError ? (
+              <Text style={{ color: '#EF4444', fontSize: 12, marginTop: 10, fontWeight: '600' }}>
+                {deleteError}
+              </Text>
+            ) : null}
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 18 }}>
+              <Button
+                title="Cancelar"
+                variant="ghost"
+                onPress={() => setDeleteModalVisible(false)}
+                style={{ flex: 1 }}
+              />
+              <Button
+                title="Excluir Espaço"
+                variant="danger"
+                onPress={handleConfirmDelete}
+                isLoading={isDeletingHousehold}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL TROCAR DE ESPAÇO */}
+      <Modal visible={switchModalVisible} animationType="fade" transparent>
+        <View style={styles.modalOverlayCenter}>
+          <View style={[styles.dialogBox, { backgroundColor: theme.surface, borderColor: theme.border }, theme.cardShadow]}>
+            <Text style={[styles.dialogTitle, { color: theme.textPrimary }]}>🔄 Trocar de Espaço?</Text>
+            <Text style={{ fontSize: 13, color: theme.textSecondary, marginTop: 6, lineHeight: 18 }}>
+              Você sairá do espaço compartilhado atual e passará a fazer parte do espaço vinculado a este código de convite.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 18 }}>
+              <Button
+                title="Cancelar"
+                variant="ghost"
+                onPress={() => setSwitchModalVisible(false)}
+                style={{ flex: 1 }}
+              />
+              <Button
+                title="Confirmar Troca"
+                variant="primary"
+                onPress={executeJoin}
+                isLoading={isJoining}
                 style={{ flex: 1 }}
               />
             </View>

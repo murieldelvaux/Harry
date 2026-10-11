@@ -56,6 +56,14 @@ export function useHousehold() {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(queryKeys.household.current, data);
+      queryClient.setQueryData(queryKeys.auth.me, (oldUser: any) =>
+        oldUser
+          ? {
+              ...oldUser,
+              household: oldUser.household ? { ...oldUser.household, ...data } : data,
+            }
+          : null
+      );
       queryClient.invalidateQueries({ queryKey: queryKeys.household.current });
       queryClient.invalidateQueries({ queryKey: queryKeys.auth.me });
     },
@@ -68,6 +76,9 @@ export function useHousehold() {
     },
     onSuccess: () => {
       queryClient.setQueryData(queryKeys.household.current, null);
+      queryClient.setQueryData(queryKeys.auth.me, (oldUser: any) =>
+        oldUser ? { ...oldUser, householdId: null, household: null } : null
+      );
       queryClient.invalidateQueries({ queryKey: queryKeys.household.current });
       queryClient.invalidateQueries({ queryKey: queryKeys.auth.me });
     },
@@ -80,6 +91,9 @@ export function useHousehold() {
     },
     onSuccess: () => {
       queryClient.setQueryData(queryKeys.household.current, null);
+      queryClient.setQueryData(queryKeys.auth.me, (oldUser: any) =>
+        oldUser ? { ...oldUser, householdId: null, household: null } : null
+      );
       queryClient.invalidateQueries({ queryKey: queryKeys.household.current });
       queryClient.invalidateQueries({ queryKey: queryKeys.auth.me });
     },
