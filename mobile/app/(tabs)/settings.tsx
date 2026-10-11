@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -67,6 +67,15 @@ export default function ProfileScreen() {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [switchModalVisible, setSwitchModalVisible] = useState(false);
+
+  // Estado de Compartilhamento de Gastos Privados
+  const [isSharingPrivate, setIsSharingPrivate] = useState<boolean>(!!user?.sharePrivateExpenses);
+
+  useEffect(() => {
+    if (user?.sharePrivateExpenses !== undefined) {
+      setIsSharingPrivate(!!user.sharePrivateExpenses);
+    }
+  }, [user?.sharePrivateExpenses]);
 
   // Estados de Convite e Telefone
   const [inviteCode, setInviteCode] = useState('');
@@ -142,10 +151,12 @@ export default function ProfileScreen() {
   };
 
   const handleToggleSharePrivateExpenses = async () => {
+    const nextVal = !isSharingPrivate;
+    setIsSharingPrivate(nextVal);
     try {
-      const nextVal = !user?.sharePrivateExpenses;
       await updateProfile({ sharePrivateExpenses: nextVal });
     } catch {
+      setIsSharingPrivate(!nextVal);
       showMessage('Erro', 'Não foi possível atualizar a permissão de gastos pessoais.');
     }
   };
@@ -529,13 +540,13 @@ export default function ProfileScreen() {
                   style={[
                     styles.toggleSwitch,
                     {
-                      backgroundColor: user?.sharePrivateExpenses ? theme.primary : (isDark ? '#334155' : '#CBD5E1'),
-                      justifyContent: user?.sharePrivateExpenses ? 'flex-end' : 'flex-start',
+                      backgroundColor: isSharingPrivate ? theme.primary : (isDark ? '#334155' : '#CBD5E1'),
+                      justifyContent: isSharingPrivate ? 'flex-end' : 'flex-start',
                     },
                   ]}
                   activeOpacity={0.8}
                 >
-                  <View style={[styles.toggleKnob, user?.sharePrivateExpenses && { backgroundColor: '#FFFFFF' }]} />
+                  <View style={[styles.toggleKnob, isSharingPrivate && { backgroundColor: '#FFFFFF' }]} />
                 </TouchableOpacity>
               </View>
 
@@ -544,7 +555,7 @@ export default function ProfileScreen() {
               </Text>
               {household.members?.map((member) => {
                 const isMe = member.id === user?.id;
-                const sharesPrivate = isMe ? !!user?.sharePrivateExpenses : !!member.sharePrivateExpenses;
+                const sharesPrivate = isMe ? isSharingPrivate : !!member.sharePrivateExpenses;
                 return (
                   <View key={member.id} style={[styles.memberRow, { borderBottomColor: theme.border }]}>
                     {member.avatarUrl ? (
