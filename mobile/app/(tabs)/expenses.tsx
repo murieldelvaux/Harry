@@ -19,6 +19,7 @@ import { CalendarRangePickerModal } from '../../src/components/CalendarRangePick
 import { useTheme } from '../../src/theme/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import { useExpenses } from '../../src/hooks/useExpenses';
+import { useAuth } from '../../src/hooks/useAuth';
 import { formatCurrency, formatDate, getCategoryLabel, maskCurrency, unmaskCurrency, maskDate } from '../../src/utils/format';
 import { ExpenseCategory, RecordScope, ExpenseDto } from '../../../packages/shared/src';
 
@@ -29,6 +30,7 @@ const MONTH_NAMES = [
 
 export default function ExpensesScreen() {
   const { theme, isDark } = useTheme();
+  const { user } = useAuth();
   const today = new Date();
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1); // 1-12
@@ -263,7 +265,10 @@ export default function ExpensesScreen() {
   const isCurrentMonthActive =
     selectedYear === today.getFullYear() && selectedMonth === today.getMonth() + 1;
 
-  const totalGeral = (summary?.totalShared || 0) + (summary?.totalPrivate || 0);
+  const totalGeral =
+    (summary?.totalShared || 0) +
+    (summary?.totalPrivate || 0) +
+    (summary?.partnerPrivate || 0);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -324,16 +329,36 @@ export default function ExpensesScreen() {
               <View style={styles.splitBadgeRow}>
                 <Text style={{ fontSize: 13 }}>🔒</Text>
                 <Text style={[styles.summarySplitLabel, { color: theme.textSecondary }]}>
-                  Privado
+                  Seu Privado
                 </Text>
               </View>
               <Text style={[styles.summarySplitValue, { color: theme.textPrimary }]}>
                 {formatCurrency(summary.totalPrivate)}
               </Text>
               <Text style={[styles.summarySplitSub, { color: theme.textMuted }]}>
-                100% individual
+                Individual
               </Text>
             </View>
+
+            {!!summary.partnerPrivate && summary.partnerPrivate > 0 ? (
+              <>
+                <View style={[styles.verticalDivider, { backgroundColor: theme.border }]} />
+                <View style={styles.summarySplitItem}>
+                  <View style={styles.splitBadgeRow}>
+                    <Text style={{ fontSize: 13 }}>👁️</Text>
+                    <Text style={[styles.summarySplitLabel, { color: theme.textSecondary }]}>
+                      Privado do Par
+                    </Text>
+                  </View>
+                  <Text style={[styles.summarySplitValue, { color: '#8B5CF6' }]}>
+                    {formatCurrency(summary.partnerPrivate)}
+                  </Text>
+                  <Text style={[styles.summarySplitSub, { color: theme.textMuted }]}>
+                    Compartilhado
+                  </Text>
+                </View>
+              </>
+            ) : null}
           </View>
         </View>
 
@@ -517,63 +542,87 @@ export default function ExpensesScreen() {
               onAction={handleOpenCreate}
             />
           ) : (
-            expenses.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={[
-                  styles.expenseCard,
-                  {
-                    backgroundColor: theme.surface,
-                    borderColor: theme.border,
-                  },
-                  theme.cardShadow,
-                ]}
-                activeOpacity={0.8}
-                onPress={() => handleOpenEdit(item)}
-              >
-                <View style={styles.cardLeft}>
-                  <Text style={[styles.cardDesc, { color: theme.textPrimary }]}>
-                    {item.description}
-                  </Text>
-                  <Text style={[styles.cardCategory, { color: theme.textSecondary }]}>
-                    {getCategoryLabel(item.category)}
-                  </Text>
-                  <View style={styles.cardFooter}>
-                    <ScopeBadge scope={item.scope} />
-                    <Text style={[styles.cardDate, { color: theme.textMuted }]}>
-                      {formatDate(item.date)}
+            expenses.map((item) => {
+              const isPartnerPrivate = item.scope === 'PRIVATE' && !!user?.id && item.userId !== user.id;
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.expenseCard,
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: isPartnerPrivate ? 'rgba(139, 92, 246, 0.35)' : theme.border,
+                    },
+                    theme.cardShadow,
+                  ]}
+                  activeOpacity={isPartnerPrivate ? 1 : 0.8}
+                  onPress={() => !isPartnerPrivate && handleOpenEdit(item)}
+                >
+                  <View style={styles.cardLeft}>
+                    <Text style={[styles.cardDesc, { color: theme.textPrimary }]}>
+                      {item.description}
                     </Text>
+                    <Text style={[styles.cardCategory, { color: theme.textSecondary }]}>
+                      {getCategoryLabel(item.category)}
+                    </Text>
+                    <View style={styles.cardFooter}>
+                      <ScopeBadge
+                        scope={item.scope}
+                        authorName={item.author?.name}
+                        isPartnerPrivate={isPartnerPrivate}
+                      />
+                      <Text style={[styles.cardDate, { color: theme.textMuted }]}>
+                        {formatDate(item.date)}
+                      </Text>
+                    </View>
                   </View>
-                </View>
 
-                <View style={styles.cardRight}>
-                  <Text style={[styles.cardAmount, { color: theme.textPrimary }]}>
-                    {formatCurrency(item.amount)}
-                  </Text>
+                  <View style={styles.cardRight}>
+                    <Text style={[styles.cardAmount, { color: theme.textPrimary }]}>
+                      {formatCurrency(item.amount)}
+                    </Text>
 
-                  <View style={styles.cardActions}>
-                    <TouchableOpacity
-                      style={[
-                        styles.actionIconBtn,
-                        { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
-                      ]}
-                      onPress={() => handleOpenEdit(item)}
-                    >
-                      <Text style={{ fontSize: 13 }}>✏️</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.actionIconBtn,
-                        { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
-                      ]}
-                      onPress={() => handleDelete(item.id, item.description)}
-                    >
-                      <Text style={{ fontSize: 13 }}>🗑️</Text>
-                    </TouchableOpacity>
+                    {isPartnerPrivate ? (
+                      <View
+                        style={{
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          borderRadius: 8,
+                          backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                          alignSelf: 'flex-end',
+                          marginTop: 6,
+                        }}
+                      >
+                        <Text style={{ fontSize: 10, color: '#8B5CF6', fontWeight: '700' }}>
+                          👁️ Leitura
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.cardActions}>
+                        <TouchableOpacity
+                          style={[
+                            styles.actionIconBtn,
+                            { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+                          ]}
+                          onPress={() => handleOpenEdit(item)}
+                        >
+                          <Text style={{ fontSize: 13 }}>✏️</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[
+                            styles.actionIconBtn,
+                            { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+                          ]}
+                          onPress={() => handleDelete(item.id, item.description)}
+                        >
+                          <Text style={{ fontSize: 13 }}>🗑️</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
-                </View>
-              </TouchableOpacity>
-            ))
+                </TouchableOpacity>
+              );
+            })
           )}
         </View>
       </ScrollView>

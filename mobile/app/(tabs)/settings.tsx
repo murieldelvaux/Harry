@@ -141,6 +141,15 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleToggleSharePrivateExpenses = async () => {
+    try {
+      const nextVal = !user?.sharePrivateExpenses;
+      await updateProfile({ sharePrivateExpenses: nextVal });
+    } catch {
+      showMessage('Erro', 'Não foi possível atualizar a permissão de gastos pessoais.');
+    }
+  };
+
   const handleSaveHouseholdName = async () => {
     setHouseholdEditError('');
     if (!newHouseholdName.trim()) {
@@ -490,30 +499,81 @@ export default function ProfileScreen() {
                 />
               </View>
 
+              {/* Permissão de Compartilhamento de Gastos Pessoais */}
+              <View
+                style={[
+                  {
+                    backgroundColor: theme.surfaceSubtle,
+                    borderColor: theme.border,
+                    marginTop: 14,
+                    padding: 14,
+                    borderRadius: 14,
+                    borderWidth: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  },
+                ]}
+              >
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={[styles.settingRowTitle, { color: theme.textPrimary }]}>
+                    👁️ Compartilhar meus gastos pessoais
+                  </Text>
+                  <Text style={[styles.settingRowDesc, { color: theme.textSecondary, marginTop: 4, lineHeight: 18 }]}>
+                    Permitir que quem estiver no espaço veja seus lançamentos privados nas finanças.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={handleToggleSharePrivateExpenses}
+                  disabled={isUpdatingProfile}
+                  style={[
+                    styles.toggleSwitch,
+                    {
+                      backgroundColor: user?.sharePrivateExpenses ? theme.primary : (isDark ? '#334155' : '#CBD5E1'),
+                      justifyContent: user?.sharePrivateExpenses ? 'flex-end' : 'flex-start',
+                    },
+                  ]}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.toggleKnob, user?.sharePrivateExpenses && { backgroundColor: '#FFFFFF' }]} />
+                </TouchableOpacity>
+              </View>
+
               <Text style={[styles.subSectionTitle, { color: theme.textSecondary, marginTop: 16 }]}>
                 Membros Conectados ({household.members?.length || 1}):
               </Text>
-              {household.members?.map((member) => (
-                <View key={member.id} style={[styles.memberRow, { borderBottomColor: theme.border }]}>
-                  {member.avatarUrl ? (
-                    <Image source={{ uri: member.avatarUrl }} style={styles.memberAvatarImg} />
-                  ) : (
-                    <View style={[styles.memberAvatar, { backgroundColor: theme.primaryLight }]}>
-                      <Text style={[styles.memberAvatarText, { color: theme.primary }]}>
-                        {member.name.charAt(0).toUpperCase()}
+              {household.members?.map((member) => {
+                const isMe = member.id === user?.id;
+                const sharesPrivate = isMe ? !!user?.sharePrivateExpenses : !!member.sharePrivateExpenses;
+                return (
+                  <View key={member.id} style={[styles.memberRow, { borderBottomColor: theme.border }]}>
+                    {member.avatarUrl ? (
+                      <Image source={{ uri: member.avatarUrl }} style={styles.memberAvatarImg} />
+                    ) : (
+                      <View style={[styles.memberAvatar, { backgroundColor: theme.primaryLight }]}>
+                        <Text style={[styles.memberAvatarText, { color: theme.primary }]}>
+                          {member.name.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.memberName, { color: theme.textPrimary }]}>
+                        {member.name} {isMe ? '(Você)' : ''}
                       </Text>
+                      <Text style={[styles.memberEmail, { color: theme.textSecondary }]}>
+                        {member.email}
+                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                        <Text style={{ fontSize: 11, color: sharesPrivate ? theme.primary : theme.textMuted, fontWeight: '600' }}>
+                          {sharesPrivate
+                            ? (isMe ? '👁️ Você compartilha gastos pessoais' : '👁️ Compartilha gastos pessoais com você')
+                            : (isMe ? '🔒 Seus gastos pessoais são privados' : '🔒 Mantém gastos pessoais privados')}
+                        </Text>
+                      </View>
                     </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.memberName, { color: theme.textPrimary }]}>
-                      {member.name} {member.id === user?.id ? '(Você)' : ''}
-                    </Text>
-                    <Text style={[styles.memberEmail, { color: theme.textSecondary }]}>
-                      {member.email}
-                    </Text>
                   </View>
-                </View>
-              ))}
+                );
+              })}
 
               {/* Ações de Gestão do Espaço */}
               <View style={styles.householdActionsRow}>

@@ -5,9 +5,10 @@ import { useTheme } from '../theme/ThemeContext';
 interface ScopeBadgeProps {
   scope: 'PRIVATE' | 'SHARED';
   authorName?: string;
+  isPartnerPrivate?: boolean;
 }
 
-export const ScopeBadge: React.FC<ScopeBadgeProps> = ({ scope, authorName }) => {
+export const ScopeBadge: React.FC<ScopeBadgeProps> = ({ scope, authorName, isPartnerPrivate }) => {
   const { theme } = useTheme();
   const isShared = scope === 'SHARED';
 
@@ -16,7 +17,11 @@ export const ScopeBadge: React.FC<ScopeBadgeProps> = ({ scope, authorName }) => 
       style={[
         styles.badge,
         {
-          backgroundColor: isShared ? theme.tagSharedBg : theme.tagPrivateBg,
+          backgroundColor: isShared
+            ? theme.tagSharedBg
+            : isPartnerPrivate
+            ? 'rgba(139, 92, 246, 0.15)'
+            : theme.tagPrivateBg,
         },
       ]}
     >
@@ -24,11 +29,19 @@ export const ScopeBadge: React.FC<ScopeBadgeProps> = ({ scope, authorName }) => 
         style={[
           styles.text,
           {
-            color: isShared ? theme.tagSharedText : theme.tagPrivateText,
+            color: isShared
+              ? theme.tagSharedText
+              : isPartnerPrivate
+              ? '#8B5CF6'
+              : theme.tagPrivateText,
           },
         ]}
       >
-        {isShared ? `🏠 Casa ${authorName ? `(${authorName})` : ''}` : '🔒 Pessoal'}
+        {isShared
+          ? `🏠 Casa ${authorName ? `(${authorName})` : ''}`
+          : isPartnerPrivate
+          ? `👁️ Pessoal (${authorName || 'Par'})`
+          : '🔒 Pessoal'}
       </Text>
     </View>
   );

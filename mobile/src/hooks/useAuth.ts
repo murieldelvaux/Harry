@@ -68,6 +68,8 @@ export function useAuth() {
     onSuccess: (updatedUser) => {
       queryClient.setQueryData(queryKeys.auth.me, (old: any) => ({ ...old, ...updatedUser }));
       queryClient.invalidateQueries({ queryKey: queryKeys.auth.me });
+      queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.household.current });
     },
   });
 

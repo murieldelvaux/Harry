@@ -31,7 +31,10 @@ export default function DashboardScreen() {
     scope: activeScope,
   });
 
-  const totalGeral = (summary?.totalShared || 0) + (summary?.totalPrivate || 0);
+  const totalGeral =
+    (summary?.totalShared || 0) +
+    (summary?.totalPrivate || 0) +
+    (summary?.partnerPrivate || 0);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -108,9 +111,27 @@ export default function DashboardScreen() {
                 {formatCurrency(summary?.totalPrivate || 0)}
               </Text>
               <Text style={[styles.splitSub, { color: theme.textMuted }]}>
-                100% Individual
+                Individual
               </Text>
             </View>
+
+            {!!summary?.partnerPrivate && summary.partnerPrivate > 0 ? (
+              <>
+                <View style={[styles.verticalDivider, { backgroundColor: theme.border }]} />
+                <View style={styles.splitMetricItem}>
+                  <View style={styles.splitIconLabel}>
+                    <Text style={{ fontSize: 13 }}>👁️</Text>
+                    <Text style={[styles.splitLabel, { color: theme.textSecondary }]}>Privado do Par</Text>
+                  </View>
+                  <Text style={[styles.splitValue, { color: '#8B5CF6' }]}>
+                    {formatCurrency(summary.partnerPrivate)}
+                  </Text>
+                  <Text style={[styles.splitSub, { color: theme.textMuted }]}>
+                    Compartilhado
+                  </Text>
+                </View>
+              </>
+            ) : null}
           </View>
         </View>
 
@@ -229,7 +250,11 @@ export default function DashboardScreen() {
                       styles.miniScopeTag,
                       {
                         backgroundColor:
-                          item.scope === 'SHARED' ? theme.tagSharedBg : theme.tagPrivateBg,
+                          item.scope === 'SHARED'
+                            ? theme.tagSharedBg
+                            : item.scope === 'PRIVATE' && !!user?.id && item.userId !== user.id
+                            ? 'rgba(139, 92, 246, 0.15)'
+                            : theme.tagPrivateBg,
                       },
                     ]}
                   >
@@ -240,11 +265,17 @@ export default function DashboardScreen() {
                           color:
                             item.scope === 'SHARED'
                               ? theme.tagSharedText
+                              : item.scope === 'PRIVATE' && !!user?.id && item.userId !== user.id
+                              ? '#8B5CF6'
                               : theme.tagPrivateText,
                         },
                       ]}
                     >
-                      {item.scope === 'SHARED' ? 'Casa' : 'Pessoal'}
+                      {item.scope === 'SHARED'
+                        ? 'Casa'
+                        : item.scope === 'PRIVATE' && !!user?.id && item.userId !== user.id
+                        ? `👁️ ${item.author?.name || 'Par'}`
+                        : 'Pessoal'}
                     </Text>
                   </View>
                 </View>

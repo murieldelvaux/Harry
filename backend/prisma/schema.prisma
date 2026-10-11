@@ -59,6 +59,7 @@ model User {
   googleAccessToken     String?
   googleRefreshToken    String?
   calendarEvents        CalendarEvent[]
+  sharePrivateExpenses  Boolean   @default(false)
 
   @@index([phoneNumber])
 }

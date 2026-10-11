@@ -58,10 +58,23 @@ export class ExpensesService {
   ) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { householdId: true },
+      select: { householdId: true, sharePrivateExpenses: true },
     });
 
     const householdId = user?.householdId;
+
+    let allowedPartnerIds: string[] = [];
+    if (householdId) {
+      const partnersSharing = await this.prisma.user.findMany({
+        where: {
+          householdId,
+          id: { not: userId },
+          sharePrivateExpenses: true,
+        },
+        select: { id: true },
+      });
+      allowedPartnerIds = partnersSharing.map((p) => p.id);
+    }
 
     // Filtro de data: por período explícito (startDate / endDate) ou por mês ("YYYY-MM")
     let dateFilter: any = undefined;
@@ -88,19 +101,31 @@ export class ExpensesService {
     // Regra de Isolamento de Escopo
     let scopeWhere: any = {};
     if (filters?.scope === 'PRIVATE') {
-      scopeWhere = { userId, scope: RecordScope.PRIVATE };
+      if (allowedPartnerIds.length > 0) {
+        scopeWhere = {
+          OR: [
+            { userId, scope: RecordScope.PRIVATE },
+            { userId: { in: allowedPartnerIds }, scope: RecordScope.PRIVATE },
+          ],
+        };
+      } else {
+        scopeWhere = { userId, scope: RecordScope.PRIVATE };
+      }
     } else if (filters?.scope === 'SHARED') {
       if (!householdId) {
-        return { summary: { totalPrivate: 0, totalShared: 0, userShareOfShared: 0, month: filters?.month || '' }, items: [] };
+        return { summary: { totalPrivate: 0, totalShared: 0, userShareOfShared: 0, partnerPrivate: 0, month: filters?.month || '' }, items: [] };
       }
       scopeWhere = { householdId, scope: RecordScope.SHARED };
     } else {
-      // ALL: Privados do usuário + Compartilhados do casal
+      // ALL: Privados do usuário + Compartilhados do casal + Privados compartilhados do par
       if (householdId) {
         scopeWhere = {
           OR: [
             { userId, scope: RecordScope.PRIVATE },
             { householdId, scope: RecordScope.SHARED },
+            ...(allowedPartnerIds.length > 0
+              ? [{ userId: { in: allowedPartnerIds }, scope: RecordScope.PRIVATE }]
+              : []),
           ],
         };
       } else {
@@ -124,12 +149,17 @@ export class ExpensesService {
 
     // Calcular Totais e Balanço
     let totalPrivate = 0;
+    let partnerPrivate = 0;
     let totalShared = 0;
 
     for (const exp of expenses) {
       const val = Number(exp.amount);
-      if (exp.scope === RecordScope.PRIVATE && exp.userId === userId) {
-        totalPrivate += val;
+      if (exp.scope === RecordScope.PRIVATE) {
+        if (exp.userId === userId) {
+          totalPrivate += val;
+        } else {
+          partnerPrivate += val;
+        }
       } else if (exp.scope === RecordScope.SHARED) {
         totalShared += val;
       }
@@ -142,6 +172,7 @@ export class ExpensesService {
         totalPrivate: Number(totalPrivate.toFixed(2)),
         totalShared: Number(totalShared.toFixed(2)),
         userShareOfShared: Number(userShareOfShared.toFixed(2)),
+        partnerPrivate: Number(partnerPrivate.toFixed(2)),
         month: filters?.month || new Date().toISOString().slice(0, 7),
       },
       items: expenses.map(this.mapExpense),
@@ -151,7 +182,9 @@ export class ExpensesService {
   async findOne(id: string, userId: string) {
     const expense = await this.prisma.expense.findUnique({
       where: { id },
-      include: { user: { select: { id: true, name: true } } },
+      include: {
+        user: { select: { id: true, name: true, householdId: true, sharePrivateExpenses: true } },
+      },
     });
 
     if (!expense) {
@@ -169,8 +202,13 @@ export class ExpensesService {
       expense.scope === RecordScope.SHARED &&
       expense.householdId &&
       expense.householdId === user?.householdId;
+    const isHouseholdPartnerPrivateAllowed =
+      expense.scope === RecordScope.PRIVATE &&
+      user?.householdId &&
+      expense.user.householdId === user.householdId &&
+      expense.user.sharePrivateExpenses === true;
 
-    if (!isOwner && !isHouseholdShared) {
+    if (!isOwner && !isHouseholdShared && !isHouseholdPartnerPrivateAllowed) {
       throw new ForbiddenException('Acesso não permitido a este registro');
     }
 
@@ -178,7 +216,11 @@ export class ExpensesService {
   }
 
   async update(id: string, userId: string, dto: UpdateExpenseDto) {
-    await this.findOne(id, userId); // Valida existência e permissão
+    const existing = await this.findOne(id, userId); // Valida existência e permissão
+
+    if (existing.scope === RecordScope.PRIVATE && existing.userId !== userId) {
+      throw new ForbiddenException('Apenas o autor pode editar este gasto pessoal');
+    }
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -213,7 +255,12 @@ export class ExpensesService {
   }
 
   async delete(id: string, userId: string) {
-    await this.findOne(id, userId); // Valida permissão
+    const existing = await this.findOne(id, userId); // Valida permissão
+
+    if (existing.scope === RecordScope.PRIVATE && existing.userId !== userId) {
+      throw new ForbiddenException('Apenas o autor pode excluir este gasto pessoal');
+    }
+
     await this.prisma.expense.delete({ where: { id } });
     return { success: true };
   }

@@ -34,7 +34,7 @@ export class HouseholdService {
       },
       include: {
         members: {
-          select: { id: true, name: true, email: true, phoneNumber: true },
+          select: { id: true, name: true, email: true, phoneNumber: true, avatarUrl: true, sharePrivateExpenses: true },
         },
       },
     });
@@ -75,7 +75,7 @@ export class HouseholdService {
         household: {
           include: {
             members: {
-              select: { id: true, name: true, email: true, phoneNumber: true },
+              select: { id: true, name: true, email: true, phoneNumber: true, avatarUrl: true, sharePrivateExpenses: true },
             },
           },
         },
@@ -110,7 +110,7 @@ export class HouseholdService {
       },
       include: {
         members: {
-          select: { id: true, name: true, email: true, phoneNumber: true, avatarUrl: true },
+          select: { id: true, name: true, email: true, phoneNumber: true, avatarUrl: true, sharePrivateExpenses: true },
         },
       },
     });

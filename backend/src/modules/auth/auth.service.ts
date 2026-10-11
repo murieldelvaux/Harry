@@ -324,13 +324,21 @@ export class AuthService {
         periodicSummaryType: true,
         periodicSummaryDay: true,
         googleAccessToken: true,
+        sharePrivateExpenses: true,
         household: {
           select: {
             id: true,
             name: true,
             inviteCode: true,
             members: {
-              select: { id: true, name: true, email: true, phoneNumber: true, avatarUrl: true },
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                phoneNumber: true,
+                avatarUrl: true,
+                sharePrivateExpenses: true,
+              },
             },
           },
         },
@@ -359,6 +367,7 @@ export class AuthService {
         ...(data.periodicSummaryType !== undefined && { periodicSummaryType: data.periodicSummaryType }),
         ...(data.periodicSummaryDay !== undefined && { periodicSummaryDay: data.periodicSummaryDay }),
         ...(data.googleAccessToken !== undefined && { googleAccessToken: data.googleAccessToken }),
+        ...(data.sharePrivateExpenses !== undefined && { sharePrivateExpenses: data.sharePrivateExpenses }),
       },
       select: {
         id: true,
@@ -372,6 +381,7 @@ export class AuthService {
         periodicSummaryType: true,
         periodicSummaryDay: true,
         googleAccessToken: true,
+        sharePrivateExpenses: true,
       },
     });
     if (data.googleAccessToken !== undefined && updated.householdId) {

@@ -46,6 +46,7 @@ export const UpdateProfileDtoSchema = z.object({
   periodicSummaryType: z.string().optional(),
   periodicSummaryDay: z.number().optional(),
   googleAccessToken: z.string().optional(),
+  sharePrivateExpenses: z.boolean().optional(),
 });
 export type UpdateProfileDto = z.infer<typeof UpdateProfileDtoSchema>;
 
@@ -59,6 +60,7 @@ export interface AuthResponseDto {
     householdId: string | null;
     avatarUrl?: string | null;
     googleAccessToken?: string | null;
+    sharePrivateExpenses?: boolean;
   };
 }
 
@@ -91,6 +93,7 @@ export interface HouseholdDetailDto {
     email: string;
     phoneNumber: string | null;
     avatarUrl?: string | null;
+    sharePrivateExpenses?: boolean;
   }>;
 }
 
@@ -132,6 +135,7 @@ export interface ExpensesSummaryDto {
   totalPrivate: number;
   totalShared: number;
   userShareOfShared: number;
+  partnerPrivate?: number;
   month: string;
 }
 
