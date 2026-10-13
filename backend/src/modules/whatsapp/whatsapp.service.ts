@@ -261,8 +261,10 @@ export class WhatsappService {
           ? (createdNames.slice(0, 15).join('\n') + (createdNames.length > 15 ? `\n...e mais ${createdNames.length - 15} itens` : ''))
           : '• Item adicionado';
 
-        await this.sendWhatsAppMessage(replyToPhone,
+        await this.sendWhatsAppMessage(
+          replyToPhone,
           `🛒 *Lista de Compras Atualizada!*${sourceNotice}\n\n${itemsText}\n\n🏷️ ${shoppingScopeLabel}\n\nJá sincronizado no app Nexo! Quando comprar, basta dar check no app! ✅📲`,
+          user?.phoneNumber || undefined,
         );
 } else if (parsed.intent === AIIntent.CREATE_TASK) {
         const dueDate = parsed.data.dueDate ? new Date(parsed.data.dueDate) : null;
@@ -722,80 +724,82 @@ export class WhatsappService {
     await this.sendWhatsAppMessage(toPhone, welcomeText);
   }
 
-  async sendWhatsAppMessage(toPhone: string, text: string) {
+  async sendWhatsAppMessage(toPhone: string, text: string, fallbackPhone?: string) {
     const accessToken = this.configService.get<string>('WHATSAPP_ACCESS_TOKEN');
     const phoneNumberId = this.configService.get<string>('WHATSAPP_PHONE_NUMBER_ID');
-    let cleanPhone = (toPhone || '').replace(/\D/g, '');
 
-    // Se não começar com 55 e tiver 10 ou 11 dígitos (DDD + número no Brasil), adiciona 55
-    if (!cleanPhone.startsWith('55') && (cleanPhone.length === 10 || cleanPhone.length === 11)) {
-      cleanPhone = '55' + cleanPhone;
-    }
+    if (!toPhone && !fallbackPhone) return;
 
-    // Normalização para celular brasileiro: Meta Cloud API exige o 9º dígito como destinatário (ex: 5535997108453)
-    if (cleanPhone.startsWith('55') && cleanPhone.length === 12) {
-      const ddd = parseInt(cleanPhone.slice(2, 4), 10);
-      if (ddd >= 11) {
-        cleanPhone = cleanPhone.slice(0, 4) + '9' + cleanPhone.slice(4);
+    // Gerar conjunto ordenado de candidatos de número de telefone
+    const candidates = new Set<string>();
+
+    const addPhoneVariants = (phoneStr?: string) => {
+      if (!phoneStr) return;
+      const digits = phoneStr.replace(/\D/g, '');
+      if (!digits) return;
+
+      // 1. Exatamente como recebido (dígitos)
+      candidates.add(digits);
+
+      // 2. Com DDI 55 se ausente
+      const withCountry = digits.startsWith('55') ? digits : `55${digits}`;
+      candidates.add(withCountry);
+
+      // 3. Variações do nono dígito no Brasil
+      if (withCountry.startsWith('55')) {
+        const national = withCountry.slice(2);
+        const ddd = national.slice(0, 2);
+
+        // Se tem 10 dígitos (DDD + 8 dígitos): adiciona formato com 9
+        if (national.length === 10) {
+          candidates.add(`55${ddd}9${national.slice(2)}`);
+        }
+        // Se tem 11 dígitos e o 3º dígito é 9 (DDD + 9 + 8 dígitos): adiciona formato sem 9
+        if (national.length === 11 && national[2] === '9') {
+          candidates.add(`55${ddd}${national.slice(3)}`);
+        }
       }
+    };
+
+    addPhoneVariants(toPhone);
+    if (fallbackPhone && fallbackPhone !== toPhone) {
+      addPhoneVariants(fallbackPhone);
     }
 
     if (!accessToken || !phoneNumberId || accessToken === 'your_meta_permanent_access_token_here') {
       this.logger.warn(
-        `[MOCK WHATSAPP OUTBOUND] Para: ${cleanPhone} | Mensagem: "${text.replace(/\n/g, ' ')}"`,
+        `[MOCK WHATSAPP OUTBOUND] Para: ${Array.from(candidates).join(', ')} | Mensagem: "${text.replace(/\n/g, ' ')}"`,
       );
       return;
     }
 
-    try {
-      await axios.post(
-        `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
-        {
-          messaging_product: 'whatsapp',
-          to: cleanPhone,
-          type: 'text',
-          text: { body: text },
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
+    for (const phone of candidates) {
+      try {
+        const response = await axios.post(
+          `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
+          {
+            messaging_product: 'whatsapp',
+            to: phone,
+            type: 'text',
+            text: { body: text },
           },
-        },
-      );
-    } catch (err: any) {
-      const errData = err?.response?.data ? JSON.stringify(err.response.data) : err.message;
-      this.logger.error(`Failed to send WhatsApp message via Meta API (${cleanPhone}): ${errData}`);
-
-      // Fallback: se falhar e tiver formato alternativo com/sem 9, tenta alternativa
-      const altPhone =
-        cleanPhone.startsWith('55') && cleanPhone.length === 13 && cleanPhone[4] === '9'
-          ? cleanPhone.slice(0, 4) + cleanPhone.slice(5)
-          : null;
-
-      if (altPhone) {
-        try {
-          await axios.post(
-            `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
-            {
-              messaging_product: 'whatsapp',
-              to: altPhone,
-              type: 'text',
-              text: { body: text },
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
             },
-            {
-              headers: {
-                Authorization: `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-              },
-            },
-          );
-          this.logger.log(`WhatsApp message successfully delivered via fallback phone: ${altPhone}`);
-        } catch (retryErr: any) {
-          const retryData = retryErr?.response?.data ? JSON.stringify(retryErr.response.data) : retryErr.message;
-          this.logger.error(`Fallback attempt also failed (${altPhone}): ${retryData}`);
+          },
+        );
+        if (response.data?.messages?.[0]?.id) {
+          this.logger.log(`✅ WhatsApp outbound entregue com sucesso para ${phone} (ID: ${response.data.messages[0].id})`);
+          return;
         }
+      } catch (err: any) {
+        const errData = err?.response?.data ? JSON.stringify(err.response.data) : err.message;
+        this.logger.warn(`Tentativa de envio WhatsApp para ${phone} falhou: ${errData}`);
       }
     }
+
+    this.logger.error(`❌ Todas as tentativas de envio WhatsApp para os candidatos [${Array.from(candidates).join(', ')}] falharam.`);
   }
 }
