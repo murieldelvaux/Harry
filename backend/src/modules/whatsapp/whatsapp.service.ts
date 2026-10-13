@@ -9,6 +9,15 @@ import { AIIntent, RecordScope, ExpenseCategory, ParsedWhatsAppResultDto } from 
 @Injectable()
 export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
+  public readonly logs: Array<{ timestamp: string; level: string; message: string; data?: any }> = [];
+
+  public logEvent(level: 'log' | 'warn' | 'error', message: string, data?: any) {
+    this.logs.unshift({ timestamp: new Date().toISOString(), level, message, data });
+    if (this.logs.length > 50) this.logs.pop();
+    if (level === 'error') this.logger.error(message, data ? JSON.stringify(data) : undefined);
+    else if (level === 'warn') this.logger.warn(message, data ? JSON.stringify(data) : undefined);
+    else this.logger.log(message, data ? JSON.stringify(data) : undefined);
+  }
 
   constructor(
     private prisma: PrismaService,
@@ -36,13 +45,14 @@ export class WhatsappService {
 
       const messageId = message.id;
       const fromNumber = '+' + message.from; // formato E.164 (ex: +5511999999999)
+      this.logEvent('log', `Webhook recebido: msgId=${messageId}, from=${fromNumber}, type=${messageType}, body=${message.text?.body || ''}`);
 
       // 1. Idempotência: Checar se o evento já foi processado
       const alreadyProcessed = await this.prisma.processedWebhookEvent.findUnique({
         where: { id: messageId },
       });
       if (alreadyProcessed) {
-        this.logger.warn(`Message ID ${messageId} already processed. Skipping.`);
+        this.logEvent('warn', `Message ID ${messageId} already processed. Skipping.`);
         return;
       }
 
@@ -53,6 +63,7 @@ export class WhatsappService {
       // 2. Identificar Usuário pelo Telefone
       const user = await this.findUserByPhone(message.from);
       const replyToPhone = message.from || user?.phoneNumber;
+      this.logEvent('log', `Usuário resolvido: ${user ? `${user.name} (ID: ${user.id}, fone: ${user.phoneNumber})` : 'NÃO ENCONTRADO'}`);
 
       if (!user) {
         await this.sendWhatsAppMessage(replyToPhone,
@@ -766,10 +777,10 @@ export class WhatsappService {
       addPhoneVariants(fallbackPhone);
     }
 
+    this.logEvent('log', `Iniciando envio WhatsApp para candidatos: [${Array.from(candidates).join(', ')}]`);
+
     if (!accessToken || !phoneNumberId || accessToken === 'your_meta_permanent_access_token_here') {
-      this.logger.warn(
-        `[MOCK WHATSAPP OUTBOUND] Para: ${Array.from(candidates).join(', ')} | Mensagem: "${text.replace(/\n/g, ' ')}"`,
-      );
+      this.logEvent('warn', `[MOCK WHATSAPP OUTBOUND] Para: ${Array.from(candidates).join(', ')} | Mensagem: "${text.replace(/\n/g, ' ')}"`);
       return;
     }
 
@@ -791,15 +802,15 @@ export class WhatsappService {
           },
         );
         if (response.data?.messages?.[0]?.id) {
-          this.logger.log(`✅ WhatsApp outbound entregue com sucesso para ${phone} (ID: ${response.data.messages[0].id})`);
+          this.logEvent('log', `✅ WhatsApp outbound entregue com sucesso para ${phone} (ID: ${response.data.messages[0].id})`);
           return;
         }
       } catch (err: any) {
         const errData = err?.response?.data ? JSON.stringify(err.response.data) : err.message;
-        this.logger.warn(`Tentativa de envio WhatsApp para ${phone} falhou: ${errData}`);
+        this.logEvent('warn', `Tentativa de envio WhatsApp para ${phone} falhou: ${errData}`);
       }
     }
 
-    this.logger.error(`❌ Todas as tentativas de envio WhatsApp para os candidatos [${Array.from(candidates).join(', ')}] falharam.`);
+    this.logEvent('error', `❌ Todas as tentativas de envio WhatsApp para os candidatos [${Array.from(candidates).join(', ')}] falharam.`);
   }
 }
