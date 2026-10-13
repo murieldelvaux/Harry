@@ -16,7 +16,7 @@ export class AppController {
     return {
       status: 'ok',
       service: 'Nexo Backend API',
-      version: '1.0.3',
+      version: '1.0.4',
       timestamp: new Date().toISOString(),
     };
   }

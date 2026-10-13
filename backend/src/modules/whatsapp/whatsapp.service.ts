@@ -654,19 +654,27 @@ export class WhatsappService {
   }
 
   private async downloadMedia(mediaId: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
-    const accessToken = this.configService.get<string>('WHATSAPP_ACCESS_TOKEN');
-    if (!accessToken) {
+    const permanentFallbackToken =
+      'EAAW6MXrS1fwBSlZA1qI7elB35bsW5WuQmaH5qeljz5ZCNcZCQXXyEF2YqfhpMyvFwCb0o2gs4Jx7BOV3KKSUc8e1RnVzbc1n3Wc9OW6whhZAUZClKZCoVGf6m7ZBQgdZBqw8oInk4pxkdZAQ7IyWpJi5bFrwx6skx7MxqMQNQ4CALzWOu4m6ermaLqJxgJKGpYguRQjpIYGkTLkGY01Mh9dVq2vCRq8caJu1CXOjIPONq';
+    const configuredToken = this.configService.get<string>('WHATSAPP_ACCESS_TOKEN');
+    const tokensToTry = [configuredToken, permanentFallbackToken].filter(
+      (t): t is string => !!t && t !== 'your_meta_permanent_access_token_here',
+    );
+    const uniqueTokens = Array.from(new Set(tokensToTry));
+
+    if (uniqueTokens.length === 0) {
       this.logger.error('Cannot download media: WHATSAPP_ACCESS_TOKEN not configured.');
       return null;
     }
 
-    try {
-      // 1. Obter metadados da mídia (incluindo URL de download temporária)
-      const metaRes = await axios.get(`https://graph.facebook.com/v21.0/${mediaId}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const mediaUrl = metaRes.data?.url;
-      const mimeType = metaRes.data?.mime_type || 'image/jpeg';
+    for (const accessToken of uniqueTokens) {
+      try {
+        // 1. Obter metadados da mídia (incluindo URL de download temporária)
+        const metaRes = await axios.get(`https://graph.facebook.com/v21.0/${mediaId}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const mediaUrl = metaRes.data?.url;
+        const mimeType = metaRes.data?.mime_type || 'image/jpeg';
 
       if (!mediaUrl) {
         this.logger.error(`No download URL found for media ${mediaId}`);
@@ -687,9 +695,10 @@ export class WhatsappService {
         mimeType,
       };
     } catch (err: any) {
-      this.logger.error(`Failed to download media ${mediaId} from Meta: ${err?.response?.data || err.message}`);
-      return null;
+      this.logger.warn(`Failed to download media ${mediaId} from Meta with token: ${err?.response?.data || err.message}`);
     }
+    }
+    return null;
   }
 
   private async findUserByPhone(rawPhone: string) {
@@ -736,8 +745,14 @@ export class WhatsappService {
   }
 
   async sendWhatsAppMessage(toPhone: string, text: string, fallbackPhone?: string) {
-    const accessToken = this.configService.get<string>('WHATSAPP_ACCESS_TOKEN');
-    const phoneNumberId = this.configService.get<string>('WHATSAPP_PHONE_NUMBER_ID');
+    const permanentFallbackToken =
+      'EAAW6MXrS1fwBSlZA1qI7elB35bsW5WuQmaH5qeljz5ZCNcZCQXXyEF2YqfhpMyvFwCb0o2gs4Jx7BOV3KKSUc8e1RnVzbc1n3Wc9OW6whhZAUZClKZCoVGf6m7ZBQgdZBqw8oInk4pxkdZAQ7IyWpJi5bFrwx6skx7MxqMQNQ4CALzWOu4m6ermaLqJxgJKGpYguRQjpIYGkTLkGY01Mh9dVq2vCRq8caJu1CXOjIPONq';
+    const configuredToken = this.configService.get<string>('WHATSAPP_ACCESS_TOKEN');
+    const tokensToTry = [configuredToken, permanentFallbackToken].filter(
+      (t): t is string => !!t && t !== 'your_meta_permanent_access_token_here',
+    );
+    const uniqueTokens = Array.from(new Set(tokensToTry));
+    const phoneNumberId = this.configService.get<string>('WHATSAPP_PHONE_NUMBER_ID') || '1425020360687320';
 
     if (!toPhone && !fallbackPhone) return;
 
@@ -779,35 +794,37 @@ export class WhatsappService {
 
     this.logEvent('log', `Iniciando envio WhatsApp para candidatos: [${Array.from(candidates).join(', ')}]`);
 
-    if (!accessToken || !phoneNumberId || accessToken === 'your_meta_permanent_access_token_here') {
+    if (uniqueTokens.length === 0 || !phoneNumberId) {
       this.logEvent('warn', `[MOCK WHATSAPP OUTBOUND] Para: ${Array.from(candidates).join(', ')} | Mensagem: "${text.replace(/\n/g, ' ')}"`);
       return;
     }
 
-    for (const phone of candidates) {
-      try {
-        const response = await axios.post(
-          `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
-          {
-            messaging_product: 'whatsapp',
-            to: phone,
-            type: 'text',
-            text: { body: text },
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
+    for (const token of uniqueTokens) {
+      for (const phone of candidates) {
+        try {
+          const response = await axios.post(
+            `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
+            {
+              messaging_product: 'whatsapp',
+              to: phone,
+              type: 'text',
+              text: { body: text },
             },
-          },
-        );
-        if (response.data?.messages?.[0]?.id) {
-          this.logEvent('log', `✅ WhatsApp outbound entregue com sucesso para ${phone} (ID: ${response.data.messages[0].id})`);
-          return;
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            },
+          );
+          if (response.data?.messages?.[0]?.id) {
+            this.logEvent('log', `✅ WhatsApp outbound entregue com sucesso para ${phone} (ID: ${response.data.messages[0].id})`);
+            return;
+          }
+        } catch (err: any) {
+          const errData = err?.response?.data ? JSON.stringify(err.response.data) : err.message;
+          this.logEvent('warn', `Tentativa de envio WhatsApp para ${phone} falhou: ${errData}`);
         }
-      } catch (err: any) {
-        const errData = err?.response?.data ? JSON.stringify(err.response.data) : err.message;
-        this.logEvent('warn', `Tentativa de envio WhatsApp para ${phone} falhou: ${errData}`);
       }
     }
 
