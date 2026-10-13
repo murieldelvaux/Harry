@@ -184,9 +184,11 @@ REGRA DE OURO SOBRE ESCOPO (PRIVADO vs COMPARTILHADO):
 - NUNCA classifique como CREATE_EXPENSE se houver a palavra "meta", "poupar" ou "guardar".
 
 3. LISTA DE COMPRAS (CREATE_SHOPPING_ITEM):
-- Se a mensagem indicar itens a comprar ou adicionar na lista (ex: "comprar leite, queijo e ovos", "colocar pão na lista"):
+- Se a mensagem indicar itens a comprar ou adicionar na lista (ex: "comprar leite, queijo e ovos", "colocar pão na lista", "adicionar geleia", "por café na lista"):
   Classifique como CREATE_SHOPPING_ITEM.
-- "items": array de itens extraídos com "name" e "quantity".
+- OBRIGATÓRIO: Extraia APENAS o nome limpo do produto (remova verbos de ação como "adicionar", "comprar", "colocar", "bota", "botar", "incluir", "por", "pôr" e "na lista", "pra lista", "de compras"). Exemplo: "Adicionar geleia" -> items: [{ name: "Geleia", quantity: "1" }], title: "Geleia".
+- "items": array de itens extraídos com "name" limpo (ex: "Geleia", "Leite", "Pão") e "quantity".
+- "title": nome limpo do primeiro item ou resumo dos itens.
 
 4. METAS (CREATE_GOAL):
 - SE contiver "meta", "objetivo", "guardar", "poupar", "juntar dinheiro" (ex: "Guardar 2000 na meta carro", "Meta viagem 5000"):
@@ -472,16 +474,34 @@ DIRETRIZES DE RECONHECIMENTO:
     }
 
     // 0. PRIORIDADE: Detecção de Lista de Compras
-    if (
+    const isShoppingIntent =
       lower.includes("lista de compras") ||
       lower.includes("lista de mercado") ||
       lower.includes("adicionar na lista") ||
       lower.includes("colocar na lista") ||
-      (lower.startsWith("comprar ") && amount === undefined)
-    ) {
+      lower.includes("por na lista") ||
+      lower.includes("pôr na lista") ||
+      lower.includes("bota na lista") ||
+      lower.includes("botar na lista") ||
+      lower.includes("na lista") ||
+      ((lower.startsWith("adicionar ") ||
+        lower.startsWith("colocar ") ||
+        lower.startsWith("bota ") ||
+        lower.startsWith("botar ") ||
+        lower.startsWith("comprar ")) &&
+        amount === undefined &&
+        !lower.includes("evento") &&
+        !lower.includes("compromisso") &&
+        !lower.includes("reuni") &&
+        !lower.includes("meta") &&
+        !lower.includes("lembr"));
+
+    if (isShoppingIntent) {
       const clean = text
-        .replace(/(?:adicionar|colocar|por|bota|botar)?\s*(?:na|pra|para)?\s*lista\s*(?:de\s*(?:compras|mercado))?/gi, "")
-        .replace(/^comprar\s*/gi, "")
+        .replace(/^(?:adicionar|colocar|por|pôr|bota|botar|comprar|incluir)\s+(?:na\s+|pra\s+|para\s+|no\s+)?(?:minha\s+)?(?:lista\s*(?:de\s*(?:compras|mercado))?)?\s*/gi, "")
+        .replace(/\s*(?:na|pra|para|no)\s+(?:minha\s+)?lista\s*(?:de\s*(?:compras|mercado))?/gi, "")
+        .replace(/^(?:adicionar|colocar|por|pôr|bota|botar|comprar|incluir)\s+/gi, "")
+        .replace(/\s*\b(?:compartilhad[ao]s?|compartilhar)\b\s*$/gi, "")
         .trim();
 
       const rawItems = clean.split(/[\n,;•-]+/).map((s) => s.trim()).filter(Boolean);
@@ -490,11 +510,13 @@ DIRETRIZES DE RECONHECIMENTO:
         quantity: "1",
       }));
 
+      const firstItemName = items[0]?.name || "Item";
+
       return {
         intent: AIIntent.CREATE_SHOPPING_ITEM,
         confidence: 0.9,
         data: {
-          title: "Lista de Compras",
+          title: firstItemName,
           scope,
           items,
         },

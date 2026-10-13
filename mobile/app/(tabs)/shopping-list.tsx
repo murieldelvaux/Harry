@@ -198,12 +198,21 @@ export default function ShoppingListScreen() {
   };
 
   const handleQuickAdd = async () => {
-    const trimmed = quickName.trim();
+    let trimmed = quickName.trim();
     if (!trimmed) return;
+
+    trimmed = trimmed
+      .replace(/^(?:adicionar|colocar|por|pôr|bota|botar|comprar|incluir)\s+(?:na\s+|pra\s+|para\s+|no\s+)?(?:minha\s+)?(?:lista\s*(?:de\s*(?:compras|mercado))?)?\s*/gi, '')
+      .replace(/\s*(?:na|pra|para|no)\s+(?:minha\s+)?lista\s*(?:de\s*(?:compras|mercado))?/gi, '')
+      .replace(/^(?:adicionar|colocar|por|pôr|bota|botar|comprar|incluir)\s+/gi, '')
+      .trim();
+
+    if (!trimmed) return;
+    const formatted = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 
     try {
       await createItem({
-        name: trimmed,
+        name: formatted,
         quantity: '1',
         category: 'Geral',
         scope: quickScope,

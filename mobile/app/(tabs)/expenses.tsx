@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Platform,
   View,
@@ -42,7 +42,7 @@ export default function ExpensesScreen() {
   const [appliedPeriod, setAppliedPeriod] = useState<{ start?: string; end?: string }>({});
   const [calendarPickerVisible, setCalendarPickerVisible] = useState(false);
 
-  const [activeScope, setActiveScope] = useState<'ALL' | 'SHARED' | 'PRIVATE'>('ALL');
+  const [activeScope, setActiveScope] = useState<'ALL' | 'SHARED' | 'PRIVATE' | 'PARTNER'>('ALL');
 
   // Modals
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -59,8 +59,9 @@ export default function ExpensesScreen() {
   // Format month string "YYYY-MM"
   const currentMonthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
 
+  const backendScope = activeScope === 'PARTNER' ? 'PRIVATE' : activeScope;
   const {
-    expenses,
+    expenses: rawExpenses,
     summary,
     isLoading,
     createExpense,
@@ -77,8 +78,19 @@ export default function ExpensesScreen() {
         startDate: appliedPeriod.start,
         endDate: appliedPeriod.end,
       }),
-    scope: activeScope,
+    scope: backendScope,
   });
+
+  const expenses = useMemo(() => {
+    if (!rawExpenses) return [];
+    if (activeScope === 'PARTNER') {
+      return rawExpenses.filter((e) => e.scope === 'PRIVATE' && !!user?.id && e.userId !== user.id);
+    }
+    if (activeScope === 'PRIVATE') {
+      return rawExpenses.filter((e) => e.scope === 'PRIVATE' && (!user?.id || e.userId === user.id));
+    }
+    return rawExpenses;
+  }, [rawExpenses, activeScope, user?.id]);
 
   // Navigation handlers for month
   const handlePrevMonth = () => {
@@ -493,31 +505,42 @@ export default function ExpensesScreen() {
 
         {/* SELETOR DE ESCOPO (CHIPS) */}
         <View style={styles.scopeChipsContainer}>
-          {(['ALL', 'SHARED', 'PRIVATE'] as const).map((s) => {
-            const isSelected = activeScope === s;
+          {[
+            { id: 'ALL', label: 'Todos' },
+            { id: 'SHARED', label: '🏠 Compartilhados' },
+            { id: 'PRIVATE', label: '🔒 Meus Privados' },
+            ...(user?.householdId || (summary?.partnerPrivate && summary.partnerPrivate > 0) || rawExpenses?.some((e) => e.scope === 'PRIVATE' && !!user?.id && e.userId !== user.id)
+              ? [{ id: 'PARTNER', label: '👁️ Privados do Par' }]
+              : []),
+          ].map(({ id, label }) => {
+            const isSelected = activeScope === id;
             return (
               <TouchableOpacity
-                key={s}
+                key={id}
                 style={[
                   styles.scopeChip,
                   {
-                    backgroundColor: isSelected ? theme.primary : theme.surface,
-                    borderColor: isSelected ? theme.primary : theme.border,
+                    backgroundColor: isSelected
+                      ? (id === 'PARTNER' ? '#8B5CF6' : theme.primary)
+                      : theme.surface,
+                    borderColor: isSelected
+                      ? (id === 'PARTNER' ? '#8B5CF6' : theme.primary)
+                      : theme.border,
                   },
                 ]}
-                onPress={() => setActiveScope(s)}
+                onPress={() => setActiveScope(id as any)}
                 activeOpacity={0.8}
               >
                 <Text
                   style={[
-                    styles.scopeChipText,
-                    {
-                      color: isSelected ? '#FFFFFF' : theme.textSecondary,
-                      fontWeight: isSelected ? '700' : '500',
-                    },
+                  styles.scopeChipText,
+                  {
+                    color: isSelected ? '#FFFFFF' : theme.textSecondary,
+                    fontWeight: isSelected ? '700' : '500',
+                  },
                   ]}
                 >
-                  {s === 'ALL' ? 'Todos' : s === 'SHARED' ? '🏠 Compartilhados' : '🔒 Privados'}
+                  {label}
                 </Text>
               </TouchableOpacity>
             );
@@ -532,14 +555,16 @@ export default function ExpensesScreen() {
 
           {expenses.length === 0 ? (
             <EmptyState
-              title="Nenhum gasto encontrado"
+              title={activeScope === 'PARTNER' ? 'Nenhum gasto do par' : 'Nenhum gasto encontrado'}
               description={
-                filterMode === 'MONTH'
+                activeScope === 'PARTNER'
+                  ? 'Seu par ainda não possui gastos pessoais cadastrados neste período, ou a permissão para visualização de gastos pessoais ainda não foi ativada por ele em Configurações.'
+                  : filterMode === 'MONTH'
                   ? `Não há lançamentos em ${MONTH_NAMES[selectedMonth - 1]} de ${selectedYear}.`
                   : 'Não há lançamentos no período informado.'
               }
-              actionTitle="+ Registrar Gasto"
-              onAction={handleOpenCreate}
+              actionTitle={activeScope === 'PARTNER' ? undefined : '+ Registrar Gasto'}
+              onAction={activeScope === 'PARTNER' ? undefined : handleOpenCreate}
             />
           ) : (
             expenses.map((item) => {

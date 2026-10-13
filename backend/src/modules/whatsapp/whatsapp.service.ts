@@ -52,7 +52,7 @@ export class WhatsappService {
 
       // 2. Identificar Usuário pelo Telefone
       const user = await this.findUserByPhone(message.from);
-      const replyToPhone = user?.phoneNumber || message.from;
+      const replyToPhone = message.from || user?.phoneNumber;
 
       if (!user) {
         await this.sendWhatsAppMessage(replyToPhone,
@@ -196,14 +196,25 @@ export class WhatsappService {
           `🎯 *Meta Cadastrada!*${sourceNotice}\n\n🏷️ *Meta:* ${goal.title}\n💰 *Alvo:* R$ ${formattedAmount}\n👥 *Escopo:* ${scopeLabel}\n\nJá atualizado no seu painel de Metas no app Nexo! 📲`,
         );
             } else if (parsed.intent === AIIntent.CREATE_SHOPPING_ITEM) {
+        // Função para remover verbos e prefixos de comando do nome do item
+        const sanitizeShoppingItemName = (name: string): string => {
+          return (name || '')
+            .replace(/^(?:adicionar|colocar|por|pôr|bota|botar|comprar|incluir)\s+(?:na\s+|pra\s+|para\s+|no\s+)?(?:minha\s+)?(?:lista\s*(?:de\s*(?:compras|mercado))?)?\s*/gi, '')
+            .replace(/\s*(?:na|pra|para|no)\s+(?:minha\s+)?lista\s*(?:de\s*(?:compras|mercado))?/gi, '')
+            .replace(/^(?:adicionar|colocar|por|pôr|bota|botar|comprar|incluir)\s+/gi, '')
+            .replace(/\s*\b(?:compartilhad[ao]s?|compartilhar)\b\s*$/gi, '')
+            .trim();
+        };
+
         let itemsToCreate = parsed.data.items && parsed.data.items.length > 0
-          ? parsed.data.items
+          ? parsed.data.items.map(it => ({
+              ...it,
+              name: sanitizeShoppingItemName(it.name),
+            })).filter(it => it.name.length > 0)
           : [];
 
         if (itemsToCreate.length === 0 && parsed.data.title) {
-          const raw = parsed.data.title
-            .replace(/^(?:comprar|adicionar\s+(?:na\s+)?lista\s*(?:de\s*(?:compras|mercado))?)\s*/i, "")
-            .trim();
+          const raw = sanitizeShoppingItemName(parsed.data.title);
           const splitItems = raw
             .split(/(?:,|\be\b|\n|•|-)+/i)
             .map((s) => s.trim())
@@ -223,10 +234,12 @@ export class WhatsappService {
 
         const createdNames: string[] = [];
         for (const it of itemsToCreate) {
-          if (!it.name || !it.name.trim()) continue;
+          const cleanName = sanitizeShoppingItemName(it.name);
+          if (!cleanName) continue;
+          const formattedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
           await this.prisma.shoppingItem.create({
             data: {
-              name: it.name.trim(),
+              name: formattedName,
               quantity: it.quantity ? it.quantity.trim() : "1",
               category: it.category ? it.category.trim() : "Geral",
               scope: shoppingScope,
@@ -234,7 +247,7 @@ export class WhatsappService {
               householdId: shoppingIsShared ? user.householdId : null,
             },
           });
-          createdNames.push(`• ${it.name}${it.quantity && it.quantity !== "1" ? ` (${it.quantity})` : ""}`);
+          createdNames.push(`• ${formattedName}${it.quantity && it.quantity !== "1" ? ` (${it.quantity})` : ""}`);
         }
 
         this.realtimeService.emit({
@@ -244,10 +257,12 @@ export class WhatsappService {
         });
 
         const sourceNotice = mediaSourceLabel ? ` (${mediaSourceLabel})` : '';
-        const itemsText = createdNames.slice(0, 15).join('\n') + (createdNames.length > 15 ? `\n...e mais ${createdNames.length - 15} itens` : '');
+        const itemsText = createdNames.length > 0
+          ? (createdNames.slice(0, 15).join('\n') + (createdNames.length > 15 ? `\n...e mais ${createdNames.length - 15} itens` : ''))
+          : '• Item adicionado';
 
         await this.sendWhatsAppMessage(replyToPhone,
-          `🛒 *Lista de Compras Atualizada!*${sourceNotice}\n\n${itemsText}\n\n🏷️ ${scopeLabel}\n\nJá sincronizado no app Nexo! Quando comprar, basta dar check no app! ✅📲`,
+          `🛒 *Lista de Compras Atualizada!*${sourceNotice}\n\n${itemsText}\n\n🏷️ ${shoppingScopeLabel}\n\nJá sincronizado no app Nexo! Quando comprar, basta dar check no app! ✅📲`,
         );
 } else if (parsed.intent === AIIntent.CREATE_TASK) {
         const dueDate = parsed.data.dueDate ? new Date(parsed.data.dueDate) : null;
@@ -711,6 +726,11 @@ export class WhatsappService {
     const accessToken = this.configService.get<string>('WHATSAPP_ACCESS_TOKEN');
     const phoneNumberId = this.configService.get<string>('WHATSAPP_PHONE_NUMBER_ID');
     let cleanPhone = (toPhone || '').replace(/\D/g, '');
+
+    // Se não começar com 55 e tiver 10 ou 11 dígitos (DDD + número no Brasil), adiciona 55
+    if (!cleanPhone.startsWith('55') && (cleanPhone.length === 10 || cleanPhone.length === 11)) {
+      cleanPhone = '55' + cleanPhone;
+    }
 
     // Normalização para celular brasileiro: Meta Cloud API exige o 9º dígito como destinatário (ex: 5535997108453)
     if (cleanPhone.startsWith('55') && cleanPhone.length === 12) {
