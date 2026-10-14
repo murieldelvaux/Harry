@@ -5,12 +5,46 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const logger = new Logger('NexoBootstrap');
   const app = await NestFactory.create(AppModule, {
-    cors: {
-      origin: '*',
-      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-      credentials: true,
-    },
     rawBody: true, // Necessário para validação HMAC do webhook WhatsApp
+  });
+
+  const allowedOriginsEnv = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
+    : [];
+
+  app.enableCors({
+    origin: (origin, callback) => {
+      // Permite requisições sem origin (apps mobile nativos, curl, webhooks)
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      // Se houver domínios especificados em CORS_ORIGINS, valida a correspondência
+      if (allowedOriginsEnv.length > 0) {
+        const isAllowed = allowedOriginsEnv.some((allowed) =>
+          allowed === '*' || allowed === origin || origin.startsWith(allowed),
+        );
+        if (isAllowed) {
+          return callback(null, true);
+        }
+      }
+
+      // Permite e reflete dinamicamente a origin que fez a requisição
+      return callback(null, true);
+    },
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Accept',
+      'X-Requested-With',
+      'Origin',
+      'x-hub-signature-256',
+    ],
+    exposedHeaders: ['Content-Range', 'X-Content-Range', 'Content-Disposition'],
+    credentials: true,
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   });
 
   app.setGlobalPrefix('api/v1', {
