@@ -277,7 +277,9 @@ export class GoogleCalendarMcpServer {
       'https://www.googleapis.com/calendar/v3/users/me/calendarList',
       {
         headers: { Authorization: `Bearer ${accessToken}` },
-        params: { minAccessRole: 'reader', showHidden: false },
+        params: {
+          maxResults: 100,
+        },
       },
     );
 

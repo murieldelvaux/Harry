@@ -69,12 +69,23 @@ export class CalendarService {
       }
     }
 
-    // Sincronização automática transparente em segundo plano (sem exigir clique manual)
+    // Sincronização automática transparente:
+    // Se for o primeiro acesso da sessão ou banco estiver vazio para o usuário, sincroniza antes de retornar
     const now = Date.now();
     const lastSync = this.lastAutoSyncByUser.get(userId) || 0;
-    if (now - lastSync > 15000) {
+    const countLocal = await this.prisma.calendarEvent.count({ where: { userId } });
+
+    if (countLocal === 0 && lastSync === 0) {
+      // Primeira carga: aguarda sincronização rápida para já preencher a tela instantaneamente
       this.lastAutoSyncByUser.set(userId, now);
-      // Dispara em background para não bloquear a resposta da requisição
+      try {
+        await this.syncWithGoogle(userId, householdId);
+      } catch (err: any) {
+        this.logger.debug(`Falha inicial silenciosa de sync: ${err?.message || err}`);
+      }
+    } else if (now - lastSync > 10000) {
+      // Cargas subsequentes: sincroniza em background e emite SSE se houver deltas
+      this.lastAutoSyncByUser.set(userId, now);
       this.syncWithGoogle(userId, householdId)
         .then((res: any) => {
           if (res?.success && ((res.importedFromGoogle ?? 0) > 0 || (res.exportedToGoogle ?? 0) > 0)) {
