@@ -421,46 +421,54 @@ export class CalendarService {
       let totalImported = 0;
 
       for (const cal of calendars) {
-        const syncState = await this.prisma.googleCalendarSyncState.findUnique({
-          where: { userId_calendarId: { userId, calendarId: cal.id } },
-        });
-
-        const syncRes = await this.mcpServer.syncIncremental(
-          user.googleAccessToken,
-          cal.id,
-          syncState?.syncToken || undefined,
-        );
-
-        if (syncRes.resyncRequired) {
-          // Token expirado (410 Gone), limpa e reexecuta full sync
-          await this.prisma.googleCalendarSyncState.update({
-            where: { id: syncState!.id },
-            data: { syncToken: null },
+        try {
+          const syncState = await this.prisma.googleCalendarSyncState.findUnique({
+            where: { userId_calendarId: { userId, calendarId: cal.id } },
           });
-          const fullRes = await this.mcpServer.syncIncremental(user.googleAccessToken, cal.id);
-          totalImported += await this.processSyncEvents(userId, householdId, cal, fullRes.events);
-          if (fullRes.nextSyncToken) {
+
+          const syncRes = await this.mcpServer.syncIncremental(
+            user.googleAccessToken,
+            cal.id,
+            syncState?.syncToken || undefined,
+          );
+
+          if (syncRes.resyncRequired) {
+            // Token expirado (410 Gone), limpa e reexecuta full sync
             await this.prisma.googleCalendarSyncState.update({
               where: { id: syncState!.id },
-              data: { syncToken: fullRes.nextSyncToken, lastSyncedAt: new Date() },
+              data: { syncToken: null },
             });
+            const fullRes = await this.mcpServer.syncIncremental(user.googleAccessToken, cal.id);
+            const imported = await this.processSyncEvents(userId, householdId, cal, fullRes.events);
+            totalImported += imported;
+            this.logger.log(`[Resync] Calendário '${cal.name}' (${cal.id}): ${imported} eventos importados.`);
+            if (fullRes.nextSyncToken) {
+              await this.prisma.googleCalendarSyncState.update({
+                where: { id: syncState!.id },
+                data: { syncToken: fullRes.nextSyncToken, lastSyncedAt: new Date() },
+              });
+            }
+          } else {
+            const imported = await this.processSyncEvents(userId, householdId, cal, syncRes.events);
+            totalImported += imported;
+            this.logger.log(`[Sync] Calendário '${cal.name}' (${cal.id}): ${imported} eventos processados.`);
+            if (syncRes.nextSyncToken) {
+              await this.prisma.googleCalendarSyncState.upsert({
+                where: { userId_calendarId: { userId, calendarId: cal.id } },
+                update: { syncToken: syncRes.nextSyncToken, lastSyncedAt: new Date() },
+                create: {
+                  userId,
+                  calendarId: cal.id,
+                  syncToken: syncRes.nextSyncToken,
+                  lastSyncedAt: new Date(),
+                  backgroundColor: cal.colors.background,
+                  foregroundColor: cal.colors.foreground,
+                },
+              });
+            }
           }
-        } else {
-          totalImported += await this.processSyncEvents(userId, householdId, cal, syncRes.events);
-          if (syncRes.nextSyncToken) {
-            await this.prisma.googleCalendarSyncState.upsert({
-              where: { userId_calendarId: { userId, calendarId: cal.id } },
-              update: { syncToken: syncRes.nextSyncToken, lastSyncedAt: new Date() },
-              create: {
-                userId,
-                calendarId: cal.id,
-                syncToken: syncRes.nextSyncToken,
-                lastSyncedAt: new Date(),
-                backgroundColor: cal.colors.background,
-                foregroundColor: cal.colors.foreground,
-              },
-            });
-          }
+        } catch (calErr: any) {
+          this.logger.warn(`Falha ao sincronizar calendário individual '${cal.name}' (${cal.id}): ${calErr?.response?.data?.error?.message || calErr?.message || calErr}`);
         }
       }
 
