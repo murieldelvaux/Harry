@@ -146,33 +146,50 @@ export class CalendarService {
       return [];
     }
 
-    const calendars = await this.mcpServer.listCalendars(user.googleAccessToken);
+    try {
+      const calendars = await this.mcpServer.listCalendars(user.googleAccessToken);
 
-    // Atualiza ou salva o estado visual de cada calendário no banco local
-    for (const cal of calendars) {
-      await this.prisma.googleCalendarSyncState.upsert({
-        where: {
-          userId_calendarId: {
+      // Atualiza ou salva o estado visual de cada calendário no banco local
+      for (const cal of calendars) {
+        await this.prisma.googleCalendarSyncState.upsert({
+          where: {
+            userId_calendarId: {
+              userId,
+              calendarId: cal.id,
+            },
+          },
+          update: {
+            calendarName: cal.name,
+            backgroundColor: cal.colors.background,
+            foregroundColor: cal.colors.foreground,
+          },
+          create: {
             userId,
             calendarId: cal.id,
+            calendarName: cal.name,
+            backgroundColor: cal.colors.background,
+            foregroundColor: cal.colors.foreground,
           },
-        },
-        update: {
-          calendarName: cal.name,
-          backgroundColor: cal.colors.background,
-          foregroundColor: cal.colors.foreground,
-        },
-        create: {
-          userId,
-          calendarId: cal.id,
-          calendarName: cal.name,
-          backgroundColor: cal.colors.background,
-          foregroundColor: cal.colors.foreground,
-        },
-      });
-    }
+        });
+      }
 
-    return calendars;
+      return calendars;
+    } catch (err: any) {
+      this.logger.warn(`Falha ao buscar calendarList do Google API (${err?.message || err}). Buscando fallback no banco de dados.`);
+      const savedStates = await this.prisma.googleCalendarSyncState.findMany({
+        where: { userId },
+      });
+      return savedStates.map((s) => ({
+        id: s.calendarId,
+        name: s.calendarName || 'Calendário',
+        isPrimary: s.calendarId === 'primary',
+        accessRole: 'reader',
+        colors: {
+          background: s.backgroundColor || '#4285F4',
+          foreground: s.foregroundColor || '#FFFFFF',
+        },
+      }));
+    }
   }
 
   async create(userId: string, householdId: string | null, dto: CreateCalendarEventDto) {
