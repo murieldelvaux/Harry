@@ -248,6 +248,9 @@ export const CreateCalendarEventDtoSchema = z.object({
   endDate: z.string().optional(),
   isAllDay: z.boolean().default(false),
   location: z.string().optional(),
+  googleCalendarId: z.string().optional(),
+  color: z.string().optional(),
+  colorId: z.string().optional(),
   scope: z.nativeEnum(RecordScope).default(RecordScope.SHARED),
   attendees: z.string().optional(), // lista ou JSON de emails/convidados
   createMeetLink: z.boolean().optional(),
@@ -266,6 +269,10 @@ export interface CalendarEventDto {
   isAllDay: boolean;
   location: string | null;
   googleEventId: string | null;
+  googleCalendarId: string | null;
+  color: string | null;
+  colorId: string | null;
+  etag: string | null;
   scope: RecordScope;
   attendees: string | null;
   userId: string;
@@ -273,6 +280,20 @@ export interface CalendarEventDto {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface GoogleCalendarItemDto {
+  id: string;
+  name: string;
+  description?: string | null;
+  isPrimary: boolean;
+  accessRole: string;
+  colors: {
+    background: string;
+    foreground: string;
+  };
+  selected?: boolean;
+}
+
 
 // -----------------------------------------------------------------------------
 // AI Parser DTOs

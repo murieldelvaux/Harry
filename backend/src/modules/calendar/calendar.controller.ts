@@ -7,9 +7,15 @@ import {
   Body,
   Param,
   Query,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { CalendarService } from './calendar.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import {
   CreateCalendarEventDto,
   UpdateCalendarEventDto,
@@ -27,6 +33,35 @@ export class CalendarController {
     @Query('end') end?: string,
   ) {
     return this.calendarService.findAll(userId, householdId, start, end);
+  }
+
+  @Get('list-calendars')
+  async listCalendars(@CurrentUser('userId') userId: string) {
+    return this.calendarService.listCalendars(userId);
+  }
+
+  @Get('context7-anchor')
+  async getContext7Anchor() {
+    return {
+      anchor: this.calendarService.getContext7Anchor(),
+    };
+  }
+
+  @Post('watch')
+  async setupWatch(
+    @CurrentUser('userId') userId: string,
+    @Body('callbackBaseUrl') callbackBaseUrl: string,
+    @Req() req: Request,
+  ) {
+    const host = callbackBaseUrl || `${req.protocol}://${req.get('host')}/api`;
+    return this.calendarService.setupPushNotifications(userId, host);
+  }
+
+  @Public()
+  @Post('webhook')
+  @HttpCode(HttpStatus.OK)
+  async handleGooglePushNotification(@Headers() headers: Record<string, string>) {
+    return this.calendarService.handlePushNotification(headers);
   }
 
   @Get(':id')

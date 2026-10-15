@@ -180,27 +180,53 @@ model ShoppingItem {
 }
 
 model CalendarEvent {
-  id            String      @id @default(uuid())
-  title         String
-  description   String?
-  startDate     DateTime
-  endDate       DateTime?
-  isAllDay      Boolean     @default(false)
-  location      String?
-  googleEventId String?
-  scope         RecordScope @default(SHARED)
-  attendees     String?
+  id               String      @id @default(uuid())
+  title            String
+  description      String?
+  startDate        DateTime
+  endDate          DateTime?
+  isAllDay         Boolean     @default(false)
+  location         String?
+  googleEventId    String?
+  googleCalendarId String?     @default("primary")
+  color            String?
+  colorId          String?
+  etag             String?
+  scope            RecordScope @default(SHARED)
+  attendees        String?
 
-  userId        String
-  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  householdId   String?
-  household     Household?  @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  householdId      String?
+  household        Household?  @relation(fields: [householdId], references: [id], onDelete: Cascade)
 
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 
   @@index([userId, startDate])
   @@index([householdId, startDate])
   @@index([googleEventId])
+  @@index([googleCalendarId])
 }
+
+model GoogleCalendarSyncState {
+  id             String    @id @default(uuid())
+  userId         String
+  calendarId     String
+  calendarName   String?
+  backgroundColor String?
+  foregroundColor String?
+  channelId      String?   @unique
+  resourceId     String?
+  expiration     DateTime?
+  syncToken      String?
+  lastSyncedAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([userId, calendarId])
+  @@index([userId])
+  @@index([channelId])
+}
+

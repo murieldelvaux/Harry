@@ -806,7 +806,8 @@ export default function CalendarScreen() {
                     {
                       backgroundColor: theme.surface,
                       borderColor: theme.border,
-                      borderLeftColor: isShared ? '#3B82F6' : '#8B5CF6',
+                      borderLeftColor: item.color || (isShared ? '#3B82F6' : '#8B5CF6'),
+                      borderLeftWidth: 5,
                     },
                     theme.cardShadow,
                   ]}

@@ -3,6 +3,7 @@ import {
   CalendarEventDto,
   CreateCalendarEventDto,
   UpdateCalendarEventDto,
+  GoogleCalendarItemDto,
 } from '../../../packages/shared/src';
 
 export interface GoogleSyncResult {
@@ -13,6 +14,7 @@ export interface GoogleSyncResult {
   message: string;
   importedFromGoogle?: number;
   exportedToGoogle?: number;
+  calendarsCount?: number;
   error?: string;
 }
 
@@ -46,6 +48,21 @@ export const calendarService = {
 
   async syncGoogle(): Promise<GoogleSyncResult> {
     const { data } = await apiClient.post<GoogleSyncResult>('/calendar/sync-google');
+    return data;
+  },
+
+  async listCalendars(): Promise<GoogleCalendarItemDto[]> {
+    const { data } = await apiClient.get<GoogleCalendarItemDto[]>('/calendar/list-calendars');
+    return data;
+  },
+
+  async setupWatch(callbackBaseUrl?: string): Promise<{ success: boolean; message: string; channels: any[] }> {
+    const { data } = await apiClient.post('/calendar/watch', { callbackBaseUrl });
+    return data;
+  },
+
+  async getContext7Anchor(): Promise<{ anchor: string }> {
+    const { data } = await apiClient.get<{ anchor: string }>('/calendar/context7-anchor');
     return data;
   },
 };
