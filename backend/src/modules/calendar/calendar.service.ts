@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import axios from 'axios';
 import crypto from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
+import { RealtimeService } from '../../common/realtime/realtime.service';
 import {
   CreateCalendarEventDto,
   UpdateCalendarEventDto,
@@ -15,8 +16,12 @@ import { Context7Manager } from './context7.config';
 export class CalendarService {
   private readonly logger = new Logger(CalendarService.name);
   private mcpServer: GoogleCalendarMcpServer;
+  private lastAutoSyncByUser = new Map<string, number>();
 
-  constructor(private prisma: PrismaService) {
+  constructor(
+    private prisma: PrismaService,
+    private realtimeService: RealtimeService,
+  ) {
     this.mcpServer = new GoogleCalendarMcpServer();
   }
 
@@ -62,6 +67,28 @@ export class CalendarService {
           startDate: { lte: new Date(end) },
         });
       }
+    }
+
+    // Sincronização automática transparente em segundo plano (sem exigir clique manual)
+    const now = Date.now();
+    const lastSync = this.lastAutoSyncByUser.get(userId) || 0;
+    if (now - lastSync > 15000) {
+      this.lastAutoSyncByUser.set(userId, now);
+      // Dispara em background para não bloquear a resposta da requisição
+      this.syncWithGoogle(userId, householdId)
+        .then((res: any) => {
+          if (res?.success && ((res.importedFromGoogle ?? 0) > 0 || (res.exportedToGoogle ?? 0) > 0)) {
+            this.realtimeService.emit({
+              type: 'CALENDAR_UPDATED',
+              userId,
+              householdId,
+              data: { origin: 'google_auto_sync', delta: res },
+            });
+          }
+        })
+        .catch((err) => {
+          this.logger.debug(`Background sync silencioso: ${err?.message || err}`);
+        });
     }
 
     return this.prisma.calendarEvent.findMany({
@@ -199,7 +226,7 @@ export class CalendarService {
       }
     }
 
-    return this.prisma.calendarEvent.create({
+    const created = await this.prisma.calendarEvent.create({
       data: {
         title: dto.title,
         description: dto.description || null,
@@ -220,6 +247,15 @@ export class CalendarService {
         user: { select: { id: true, name: true, avatarUrl: true } },
       },
     });
+
+    this.realtimeService.emit({
+      type: 'CALENDAR_UPDATED',
+      userId,
+      householdId: isShared ? householdId : null,
+      data: { action: 'CREATE', eventId: created.id },
+    });
+
+    return created;
   }
 
   async update(userId: string, id: string, dto: UpdateCalendarEventDto) {
@@ -290,7 +326,7 @@ export class CalendarService {
       }
     }
 
-    return this.prisma.calendarEvent.update({
+    const updated = await this.prisma.calendarEvent.update({
       where: { id },
       data: {
         ...(dto.title && { title: dto.title }),
@@ -310,6 +346,15 @@ export class CalendarService {
         user: { select: { id: true, name: true, avatarUrl: true } },
       },
     });
+
+    this.realtimeService.emit({
+      type: 'CALENDAR_UPDATED',
+      userId,
+      householdId: updated.householdId,
+      data: { action: 'UPDATE', eventId: updated.id },
+    });
+
+    return updated;
   }
 
   async delete(userId: string, id: string) {
@@ -332,7 +377,16 @@ export class CalendarService {
       }
     }
 
-    return this.prisma.calendarEvent.delete({ where: { id } });
+    const deleted = await this.prisma.calendarEvent.delete({ where: { id } });
+
+    this.realtimeService.emit({
+      type: 'CALENDAR_UPDATED',
+      userId,
+      householdId: existing.householdId,
+      data: { action: 'DELETE', eventId: id },
+    });
+
+    return deleted;
   }
 
   /**
@@ -596,6 +650,18 @@ export class CalendarService {
         });
       }
     }
+
+    // Notifica instantaneamente todos os clientes conectados (App Mobile e Web) via SSE
+    this.realtimeService.emit({
+      type: 'CALENDAR_UPDATED',
+      userId,
+      householdId: user.householdId,
+      data: {
+        origin: 'google_push_notification',
+        calendarId,
+        processedCount: syncRes.events.length,
+      },
+    });
 
     return { handled: true, changesProcessed: syncRes.events.length };
   }

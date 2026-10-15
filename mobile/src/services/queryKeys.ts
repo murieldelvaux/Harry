@@ -23,6 +23,7 @@ export const queryKeys = {
   calendar: {
     all: ['calendar'] as const,
     list: (start?: string, end?: string) => ['calendar', 'list', { start, end }] as const,
+    sharedCalendars: ['calendar', 'shared-calendars'] as const,
   },
   household: {
     current: ['household', 'current'] as const,

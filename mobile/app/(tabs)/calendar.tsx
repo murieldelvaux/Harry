@@ -45,6 +45,9 @@ export default function CalendarScreen() {
     isLoading,
     isRefetching,
     refetch,
+    sharedCalendars,
+    isLoadingSharedCalendars,
+    refetchSharedCalendars,
     createEvent,
     isCreating,
     updateEvent,
@@ -616,6 +619,50 @@ export default function CalendarScreen() {
           </View>
         </View>
 
+        {/* CARROSSEL DE CALENDÁRIOS GOOGLE (INCLUSIVE COMPARTILHADOS) COM CORES ORIGINAIS */}
+        {hasGoogleConnected && sharedCalendars && sharedCalendars.length > 0 && (
+          <View style={{ marginBottom: 14 }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textSecondary, marginBottom: 8, paddingHorizontal: 4 }}>
+              SUAS AGENDAS SINCRONIZADAS EM TEMPO REAL:
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+              {sharedCalendars.map((cal) => (
+                <View
+                  key={cal.id}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                    borderRadius: 16,
+                    backgroundColor: theme.surface,
+                    borderWidth: 1.5,
+                    borderColor: cal.colors.background || theme.border,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: 5,
+                      backgroundColor: cal.colors.background || '#4285F4',
+                    }}
+                  />
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textPrimary }}>
+                    {cal.name}
+                  </Text>
+                  {!cal.isPrimary && (
+                    <Text style={{ fontSize: 10, color: cal.colors.background || theme.primary, fontWeight: '700' }}>
+                      (Compartilhada)
+                    </Text>
+                  )}
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {/* CONTROLES DO MÊS */}
         <View style={[styles.calendarCard, { backgroundColor: theme.surface, borderColor: theme.border }, theme.cardShadow]}>
           <View style={styles.monthHeader}>
@@ -847,9 +894,27 @@ export default function CalendarScreen() {
                         ) : null}
 
                         {item.googleEventId ? (
-                          <View style={[styles.scopeBadge, { backgroundColor: '#E0F2FE' }]}>
-                            <Text style={[styles.scopeBadgeText, { color: '#0369A1' }]}>
-                              🗓️ Google
+                          <View
+                            style={[
+                              styles.scopeBadge,
+                              {
+                                backgroundColor: item.color ? `${item.color}22` : '#E0F2FE',
+                                borderColor: item.color || '#0369A1',
+                                borderWidth: 1,
+                              },
+                            ]}
+                          >
+                            <View
+                              style={{
+                                width: 7,
+                                height: 7,
+                                borderRadius: 4,
+                                backgroundColor: item.color || '#4285F4',
+                                marginRight: 4,
+                              }}
+                            />
+                            <Text style={[styles.scopeBadgeText, { color: item.color || '#0369A1', fontWeight: '700' }]}>
+                              {item.googleCalendarId && item.googleCalendarId !== 'primary' ? '👥 Compartilhada' : '🗓️ Google'}
                             </Text>
                           </View>
                         ) : null}

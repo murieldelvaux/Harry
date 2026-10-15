@@ -13,6 +13,14 @@ export function useCalendar(start?: string, end?: string) {
   const eventsQuery = useQuery({
     queryKey: queryKeys.calendar.list(start, end),
     queryFn: () => calendarService.getAll(start, end),
+    refetchInterval: 10000, // Polling de backup rápido a cada 10s caso Webhook/SSE oscile
+    refetchIntervalInBackground: false,
+  });
+
+  const sharedCalendarsQuery = useQuery({
+    queryKey: queryKeys.calendar.sharedCalendars,
+    queryFn: () => calendarService.listCalendars(),
+    staleTime: 60000,
   });
 
   const createMutation = useMutation({
@@ -50,6 +58,9 @@ export function useCalendar(start?: string, end?: string) {
     isRefetching: eventsQuery.isRefetching,
     isError: eventsQuery.isError,
     refetch: eventsQuery.refetch,
+    sharedCalendars: sharedCalendarsQuery.data || [],
+    isLoadingSharedCalendars: sharedCalendarsQuery.isLoading,
+    refetchSharedCalendars: sharedCalendarsQuery.refetch,
     createEvent: createMutation.mutateAsync,
     isCreating: createMutation.isPending,
     updateEvent: updateMutation.mutateAsync,
