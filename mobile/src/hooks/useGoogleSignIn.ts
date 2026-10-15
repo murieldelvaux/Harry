@@ -25,7 +25,14 @@ export function useGoogleSignIn() {
     webClientId: WEB_ID || 'not-configured',
     iosClientId: IOS_ID || WEB_ID || 'not-configured',
     androidClientId: ANDROID_ID || WEB_ID || 'not-configured',
-    scopes: ['openid', 'profile', 'email', 'https://www.googleapis.com/auth/calendar.events'],
+    scopes: [
+      'openid',
+      'profile',
+      'email',
+      'https://www.googleapis.com/auth/calendar',
+      'https://www.googleapis.com/auth/calendar.events',
+      'https://www.googleapis.com/auth/calendar.readonly',
+    ],
   });
 
   useEffect(() => {

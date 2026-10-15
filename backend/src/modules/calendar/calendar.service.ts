@@ -70,21 +70,21 @@ export class CalendarService {
     }
 
     // Sincronização automática transparente:
-    // Se for o primeiro acesso da sessão ou banco estiver vazio para o usuário, sincroniza antes de retornar
+    // Se for a primeira chamada desta sessão (lastSync === 0), aguarda o sync dos calendários
+    // para que a primeira renderização do app já venha 100% preenchida com todas as agendas
     const now = Date.now();
     const lastSync = this.lastAutoSyncByUser.get(userId) || 0;
-    const countLocal = await this.prisma.calendarEvent.count({ where: { userId } });
 
-    if (countLocal === 0 && lastSync === 0) {
-      // Primeira carga: aguarda sincronização rápida para já preencher a tela instantaneamente
+    if (lastSync === 0) {
       this.lastAutoSyncByUser.set(userId, now);
       try {
+        this.logger.log(`Primeiro acesso do usuário ${userId}: sincronizando todas as agendas Google...`);
         await this.syncWithGoogle(userId, householdId);
       } catch (err: any) {
-        this.logger.debug(`Falha inicial silenciosa de sync: ${err?.message || err}`);
+        this.logger.warn(`Falha na sincronização automática inicial: ${err?.message || err}`);
       }
-    } else if (now - lastSync > 10000) {
-      // Cargas subsequentes: sincroniza em background e emite SSE se houver deltas
+    } else if (now - lastSync > 8000) {
+      // Cargas subsequentes: sincroniza deltas em background e emite SSE se houver novos dados
       this.lastAutoSyncByUser.set(userId, now);
       this.syncWithGoogle(userId, householdId)
         .then((res: any) => {
@@ -417,6 +417,7 @@ export class CalendarService {
     try {
       // 1. Obter lista de calendários (inclusive compartilhados) com cores
       const calendars = await this.listCalendars(userId);
+      this.logger.log(`Encontrados ${calendars.length} calendários para o usuário ${userId}: ${calendars.map(c => `${c.name} (${c.id})`).join(', ')}`);
       let totalImported = 0;
 
       for (const cal of calendars) {
