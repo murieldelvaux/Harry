@@ -99,8 +99,10 @@ export class TaskReminderService implements OnModuleInit, OnModuleDestroy {
           });
         }
       }
-    } catch (error) {
-      this.logger.error('Erro ao verificar lembretes pendentes', error);
+    } catch (error: any) {
+      if (!error?.message?.includes('Can\'t reach database server')) {
+        this.logger.error('Erro ao verificar lembretes pendentes', error);
+      }
     }
   }
 }

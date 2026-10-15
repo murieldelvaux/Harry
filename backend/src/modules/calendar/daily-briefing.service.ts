@@ -90,8 +90,10 @@ export class DailyBriefingService implements OnModuleInit, OnModuleDestroy {
           }
         }
       }
-    } catch (error) {
-      this.logger.error('Erro ao processar resumos diários/periódicos:', error);
+    } catch (error: any) {
+      if (!error?.message?.includes('Can\'t reach database server')) {
+        this.logger.error('Erro ao processar resumos diários/periódicos:', error);
+      }
     }
   }
 
