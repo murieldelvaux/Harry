@@ -9,6 +9,7 @@ import {
   Image,
   Modal,
   Share,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
@@ -19,6 +20,8 @@ import { AppHeader } from '../../src/components/AppHeader';
 import { Input } from '../../src/components/Input';
 import { Button } from '../../src/components/Button';
 import { maskPhone, maskTime } from '../../src/utils/format';
+import { notificationService } from '../../src/services/notification.service';
+import { calendarService } from '../../src/services/calendar.service';
 
 // Avatares rápidos disponíveis para escolha
 const AVATAR_PRESETS = [
@@ -82,11 +85,23 @@ export default function ProfileScreen() {
   const [joinError, setJoinError] = useState('');
   const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber ? maskPhone(user.phoneNumber) : '');
   const [phoneSaved, setPhoneSaved] = useState(false);
-  // Estados de Notificação e Resumos no WhatsApp
+  // Estados de Notificação e Resumos
   const [dailyTime, setDailyTime] = useState(user?.dailySummaryTime ? maskTime(user.dailySummaryTime) : '06:00');
   const [enableDaily, setEnableDaily] = useState(user?.enableDailySummary !== false);
   const [periodicType, setPeriodicType] = useState<string>(user?.periodicSummaryType || "none");
   const [isSavingNotifs, setIsSavingNotifs] = useState(false);
+  const [isTestingBriefing, setIsTestingBriefing] = useState(false);
+  const [isTestingLocalNotif, setIsTestingLocalNotif] = useState(false);
+  const [briefingModalVisible, setBriefingModalVisible] = useState(false);
+  const [briefingPreviewText, setBriefingPreviewText] = useState('');
+  const [briefingStatus, setBriefingStatus] = useState('');
+
+  // Sincroniza agendamento no celular local ao montar
+  useEffect(() => {
+    if (user?.enableDailySummary !== false) {
+      notificationService.scheduleDailyBriefing(user?.dailySummaryTime || '06:00');
+    }
+  }, [user?.enableDailySummary, user?.dailySummaryTime]);
 
   const handleSaveNotificationSettings = async () => {
     setIsSavingNotifs(true);
@@ -96,11 +111,56 @@ export default function ProfileScreen() {
         enableDailySummary: enableDaily,
         periodicSummaryType: periodicType,
       });
-      showMessage("Preferências Salvas!", "Seus horários de resumos e lembretes foram configurados.");
+
+      if (enableDaily) {
+        await notificationService.scheduleDailyBriefing(dailyTime);
+      } else {
+        await notificationService.cancelDailyBriefing();
+      }
+
+      showMessage(
+        "Preferências Salvas!",
+        `Seu resumo diário foi configurado para as ${dailyTime} com Agenda, Lembretes e Lista de Compras.`
+      );
     } catch {
       showMessage("Erro", "Não foi possível salvar as configurações de notificação.");
     } finally {
       setIsSavingNotifs(false);
+    }
+  };
+
+  const handleTestLocalNotification = async () => {
+    setIsTestingLocalNotif(true);
+    try {
+      const ok = await notificationService.triggerTestNotification(
+        "Agenda: Compromissos do dia • Lembretes: Tarefas ativas • Compras: Itens pendentes. Notificações do celular ativas!"
+      );
+      if (ok) {
+        showMessage("Notificação Enviada!", "Verifique a barra de notificações do seu celular.");
+      } else {
+        showMessage("Atenção", "Permissão de notificação ainda pendente nas configurações do dispositivo.");
+      }
+    } catch {
+      showMessage("Erro", "Não foi possível disparar a notificação.");
+    } finally {
+      setIsTestingLocalNotif(false);
+    }
+  };
+
+  const handleTestBriefing = async () => {
+    setIsTestingBriefing(true);
+    try {
+      const res = await calendarService.triggerDailyBriefing();
+      setBriefingPreviewText(res.summary);
+      setBriefingStatus(res.whatsappStatus || "Resumo gerado com sucesso!");
+      setBriefingModalVisible(true);
+    } catch (e: any) {
+      showMessage(
+        "Erro ao Testar",
+        e?.response?.data?.message || e.message || "Não foi possível gerar o resumo diário de teste."
+      );
+    } finally {
+      setIsTestingBriefing(false);
     }
   };
 
@@ -347,7 +407,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* SEÇÃO 1.5: RESUMOS & LEMBRETES NO WHATSAPP */}
+        {/* SEÇÃO 1.5: NOTIFICAÇÕES & RESUMOS DIÁRIOS */}
         <View style={[styles.sectionCard, { backgroundColor: theme.surface, borderColor: theme.border }, theme.cardShadow]}>
           <View style={styles.sectionHeaderRow}>
             <View style={[styles.sectionIconBadge, { backgroundColor: isDark ? "rgba(245, 158, 11, 0.15)" : "#FEF3C7" }]}>
@@ -355,22 +415,35 @@ export default function ProfileScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-                Resumos Diários & Periódicos
+                Notificações & Resumo Diário
               </Text>
               <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-                Receba sua programação matinal direto no seu WhatsApp
+                Agenda, lembretes e lista de compras todos os dias às {dailyTime}
               </Text>
             </View>
           </View>
 
           <View style={{ marginTop: 14 }}>
-            <View style={styles.settingRow}>
+            {/* O que é incluso no resumo diário */}
+            <View style={styles.briefingPillsRow}>
+              <View style={[styles.briefingPill, { backgroundColor: isDark ? "rgba(99, 102, 241, 0.15)" : "#EEF2FF", borderColor: theme.border }]}>
+                <Text style={[styles.briefingPillText, { color: theme.primary }]}>📅 Agenda do Dia</Text>
+              </View>
+              <View style={[styles.briefingPill, { backgroundColor: isDark ? "rgba(16, 185, 129, 0.15)" : "#ECFDF5", borderColor: theme.border }]}>
+                <Text style={[styles.briefingPillText, { color: "#10B981" }]}>📌 Lembretes & Tarefas</Text>
+              </View>
+              <View style={[styles.briefingPill, { backgroundColor: isDark ? "rgba(245, 158, 11, 0.15)" : "#FEF3C7", borderColor: theme.border }]}>
+                <Text style={[styles.briefingPillText, { color: "#F59E0B" }]}>🛒 Lista de Compras</Text>
+              </View>
+            </View>
+
+            <View style={[styles.settingRow, { marginTop: 12 }]}>
               <View style={{ flex: 1, paddingRight: 12 }}>
                 <Text style={[styles.settingRowTitle, { color: theme.textPrimary }]}>
-                  Resumo Matinal Diário
+                  Notificação Matinal Diária
                 </Text>
                 <Text style={[styles.settingRowDesc, { color: theme.textSecondary }]}>
-                  Receba compromissos, tarefas e compras do dia no seu WhatsApp às {dailyTime}.
+                  Dispara no celular e via WhatsApp com seu resumo completo.
                 </Text>
               </View>
               <TouchableOpacity
@@ -401,6 +474,35 @@ export default function ProfileScreen() {
                 />
               </View>
             )}
+
+            {/* Status dos canais de notificação */}
+            <View style={[styles.notificationChannelsBox, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
+              <View style={styles.channelRow}>
+                <Text style={styles.channelIcon}>📱</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.channelTitle, { color: theme.textPrimary }]}>Notificação no Celular (Push Local)</Text>
+                  <Text style={[styles.channelStatus, { color: "#10B981" }]}>
+                    ● Ativa todos os dias às {dailyTime} (mesmo se o app estiver fechado)
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.channelDivider, { backgroundColor: theme.border }]} />
+              <View style={styles.channelRow}>
+                <Text style={styles.channelIcon}>💬</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.channelTitle, { color: theme.textPrimary }]}>Resumo no WhatsApp</Text>
+                  {user?.phoneNumber ? (
+                    <Text style={[styles.channelStatus, { color: "#10B981" }]}>
+                      ● Conectado ao número {maskPhone(user.phoneNumber)}
+                    </Text>
+                  ) : (
+                    <Text style={[styles.channelStatus, { color: "#F59E0B" }]}>
+                      ⚠️ Não cadastrado. Salve seu WhatsApp no bloco acima para receber mensagens automáticas.
+                    </Text>
+                  )}
+                </View>
+              </View>
+            </View>
 
             <View style={{ marginTop: 14 }}>
               <Text style={[styles.settingRowTitle, { color: theme.textPrimary, marginBottom: 4 }]}>
@@ -452,6 +554,31 @@ export default function ProfileScreen() {
               isLoading={isSavingNotifs}
               style={{ marginTop: 14 }}
             />
+
+            {/* Botões de Teste Imediato */}
+            <View style={styles.testButtonsRow}>
+              <TouchableOpacity
+                style={[styles.testButton, { borderColor: theme.border, backgroundColor: theme.surfaceSubtle }]}
+                onPress={handleTestLocalNotification}
+                disabled={isTestingLocalNotif}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.testButtonText, { color: theme.textPrimary }]}>
+                  {isTestingLocalNotif ? 'Disparando...' : '🔔 Testar no Celular'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.testButton, { borderColor: theme.border, backgroundColor: theme.surfaceSubtle }]}
+                onPress={handleTestBriefing}
+                disabled={isTestingBriefing}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.testButtonText, { color: theme.primary }]}>
+                  {isTestingBriefing ? 'Gerando...' : '📨 Testar Envio Agora'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -969,6 +1096,43 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* MODAL PREVIEW DO RESUMO DIÁRIO */}
+      <Modal visible={briefingModalVisible} animationType="fade" transparent>
+        <View style={styles.modalOverlayCenter}>
+          <View style={[styles.dialogBox, { backgroundColor: theme.surface, borderColor: theme.border, maxHeight: '80%' }, theme.cardShadow]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text style={[styles.dialogTitle, { color: theme.textPrimary }]}>🌅 Prévia do Resumo</Text>
+              <TouchableOpacity onPress={() => setBriefingModalVisible(false)} hitSlop={12}>
+                <Text style={{ fontSize: 18, color: theme.textSecondary }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {briefingStatus ? (
+              <View style={[styles.briefingStatusBadge, { backgroundColor: theme.surfaceSubtle }]}>
+                <Text style={{ fontSize: 12, color: theme.primary, fontWeight: '600' }}>
+                  {briefingStatus}
+                </Text>
+              </View>
+            ) : null}
+
+            <ScrollView style={{ marginTop: 12, maxHeight: 340 }}>
+              <View style={[styles.briefingTextContainer, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
+                <Text style={[styles.briefingText, { color: theme.textPrimary }]}>
+                  {briefingPreviewText}
+                </Text>
+              </View>
+            </ScrollView>
+
+            <Button
+              title="Entendi, Fechar"
+              variant="primary"
+              onPress={() => setBriefingModalVisible(false)}
+              style={{ marginTop: 16 }}
+            />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1376,5 +1540,82 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '700',
+  },
+  briefingPillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 4,
+  },
+  briefingPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  briefingPillText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  notificationChannelsBox: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 12,
+    gap: 8,
+  },
+  channelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  channelIcon: {
+    fontSize: 20,
+  },
+  channelTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  channelStatus: {
+    fontSize: 11,
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  channelDivider: {
+    height: 1,
+    marginVertical: 2,
+  },
+  testButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+  },
+  testButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  testButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  briefingStatusBadge: {
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  briefingTextContainer: {
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  briefingText: {
+    fontSize: 13,
+    lineHeight: 20,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
 });
