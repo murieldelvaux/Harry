@@ -21,9 +21,19 @@ import {
   UpdateCalendarEventDto,
 } from '../../../../packages/shared/src';
 
+import { DailyBriefingService } from './daily-briefing.service';
+
 @Controller('calendar')
 export class CalendarController {
-  constructor(private readonly calendarService: CalendarService) {}
+  constructor(
+    private readonly calendarService: CalendarService,
+    private readonly dailyBriefingService: DailyBriefingService,
+  ) {}
+
+  @Post('daily-briefing/trigger')
+  async triggerDailyBriefing(@CurrentUser('userId') userId: string) {
+    return this.dailyBriefingService.triggerUserDailyBriefing(userId);
+  }
 
   @Get()
   async findAll(

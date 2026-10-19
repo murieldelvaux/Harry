@@ -65,4 +65,21 @@ export const calendarService = {
     const { data } = await apiClient.get<{ anchor: string }>('/calendar/context7-anchor');
     return data;
   },
+
+  async triggerDailyBriefing(): Promise<{
+    success: boolean;
+    message: string;
+    summary: string;
+    whatsappSent: boolean;
+    whatsappStatus: string;
+    phoneNumber?: string;
+    stats: {
+      eventsCount: number;
+      tasksCount: number;
+      shoppingCount: number;
+    };
+  }> {
+    const { data } = await apiClient.post('/calendar/daily-briefing/trigger');
+    return data;
+  },
 };

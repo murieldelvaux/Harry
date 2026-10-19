@@ -58,11 +58,15 @@ export class DailyBriefingService implements OnModuleInit, OnModuleDestroy {
 
         // 1. Resumo Diário
         if (isTimeForDaily && user.lastDailySummaryDate !== todayStr) {
-          await this.sendDailyBriefing(user, todayStr);
-          await this.prisma.user.update({
-            where: { id: user.id },
-            data: { lastDailySummaryDate: todayStr },
-          });
+          try {
+            await this.sendDailyBriefing(user, todayStr);
+            await this.prisma.user.update({
+              where: { id: user.id },
+              data: { lastDailySummaryDate: todayStr },
+            });
+          } catch (err: any) {
+            this.logger.error(`Falha ao disparar resumo diário para usuário ${user.id} (${user.name}): ${err.message}`);
+          }
         }
 
         // 2. Resumo Periódico (Semanal ou Quinzenal)
@@ -82,11 +86,15 @@ export class DailyBriefingService implements OnModuleInit, OnModuleDestroy {
           }
 
           if (canSendPeriodic) {
-            await this.sendPeriodicBriefing(user, summaryType);
-            await this.prisma.user.update({
-              where: { id: user.id },
-              data: { lastPeriodicDate: todayStr },
-            });
+            try {
+              await this.sendPeriodicBriefing(user, summaryType);
+              await this.prisma.user.update({
+                where: { id: user.id },
+                data: { lastPeriodicDate: todayStr },
+              });
+            } catch (err: any) {
+              this.logger.error(`Falha ao disparar resumo periódico para usuário ${user.id}: ${err.message}`);
+            }
           }
         }
       }
@@ -97,9 +105,50 @@ export class DailyBriefingService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async sendDailyBriefing(user: any, todayStr: string) {
-    this.logger.log(`Enviando resumo matinal diário para ${user.name || user.email} (${user.phoneNumber})`);
+  public async triggerUserDailyBriefing(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
 
+    if (!user) {
+      throw new Error('Usuário não encontrado');
+    }
+
+    const now = new Date();
+    const brasiliaDate = new Date(now.getTime() - 3 * 3600 * 1000);
+    const todayStr = brasiliaDate.toISOString().slice(0, 10);
+
+    const { message, eventsCount, tasksCount, shoppingCount } = await this.buildDailyBriefing(user, todayStr);
+
+    let whatsappSent = false;
+    let whatsappStatus = 'Sem telefone cadastrado';
+
+    if (user.phoneNumber) {
+      try {
+        await this.whatsappService.sendWhatsAppMessage(user.phoneNumber, message);
+        whatsappSent = true;
+        whatsappStatus = 'Mensagem enviada com sucesso para o WhatsApp!';
+      } catch (err: any) {
+        whatsappStatus = `Tentativa de envio ao WhatsApp falhou: ${err.message}`;
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Resumo diário processado com sucesso!',
+      summary: message,
+      whatsappSent,
+      whatsappStatus,
+      phoneNumber: user.phoneNumber,
+      stats: {
+        eventsCount,
+        tasksCount,
+        shoppingCount,
+      },
+    };
+  }
+
+  private async buildDailyBriefing(user: any, todayStr: string) {
     const startOfDay = new Date(`${todayStr}T00:00:00-03:00`);
     const endOfDay = new Date(`${todayStr}T23:59:59.999-03:00`);
 
@@ -141,7 +190,21 @@ export class DailyBriefingService implements OnModuleInit, OnModuleDestroy {
     });
 
     // 3. Buscar Itens pendentes da lista de compras
-    const shoppingCount = await this.prisma.shoppingItem.count({
+    const shoppingItems = await this.prisma.shoppingItem.findMany({
+      where: {
+        OR: [
+          { userId: user.id },
+          ...(user.householdId
+            ? [{ householdId: user.householdId, scope: RecordScope.SHARED }]
+            : []),
+        ],
+        isCompleted: false,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 12,
+    });
+
+    const totalShoppingCount = await this.prisma.shoppingItem.count({
       where: {
         OR: [
           { userId: user.id },
@@ -174,7 +237,7 @@ export class DailyBriefingService implements OnModuleInit, OnModuleDestroy {
         .join('\n');
     }
 
-    let tasksBlock = '• _Nenhuma tarefa ou conta com vencimento para hoje!_';
+    let tasksBlock = '• _Nenhuma tarefa ou lembrete pendente para hoje!_';
     if (tasks.length > 0) {
       tasksBlock = tasks
         .map((tk: any) => {
@@ -187,21 +250,44 @@ export class DailyBriefingService implements OnModuleInit, OnModuleDestroy {
         .join('\n');
     }
 
-    let shoppingNote = '';
-    if (shoppingCount > 0) {
-      shoppingNote = `\n🛒 *Lista de Compras:* ${shoppingCount} ite${shoppingCount > 1 ? 'ns pendentes' : 'm pendente'}.`;
+    let shoppingBlock = '• _Nenhum item pendente na lista de compras._';
+    if (shoppingItems.length > 0) {
+      shoppingBlock = shoppingItems
+        .map((item: any) => {
+          const qty = item.quantity && item.quantity !== '1' ? ` (${item.quantity})` : '';
+          const scope = item.scope === RecordScope.SHARED ? ' 🏠' : '';
+          return `• ${item.name}${qty}${scope}`;
+        })
+        .join('\n');
+      if (totalShoppingCount > shoppingItems.length) {
+        shoppingBlock += `\n_... e mais ${totalShoppingCount - shoppingItems.length} item(ns) no app._`;
+      }
     }
 
     const message = `🌅 *Bom dia, ${firstName}! Aqui está seu Resumo Nexo de Hoje*
 
-📅 *Compromissos & Eventos de Hoje:*
+📅 *Compromissos & Agenda:*
 ${eventsBlock}
 
 📌 *Lembretes & Tarefas:*
-${tasksBlock}${shoppingNote}
+${tasksBlock}
+
+🛒 *Lista de Compras:*
+${shoppingBlock}
 
 Tenha um dia muito produtivo e abençoado! ✨📱`;
 
+    return {
+      message,
+      eventsCount: events.length,
+      tasksCount: tasks.length,
+      shoppingCount: totalShoppingCount,
+    };
+  }
+
+  private async sendDailyBriefing(user: any, todayStr: string) {
+    this.logger.log(`Enviando resumo matinal diário para ${user.name || user.email} (${user.phoneNumber})`);
+    const { message } = await this.buildDailyBriefing(user, todayStr);
     await this.whatsappService.sendWhatsAppMessage(user.phoneNumber, message);
   }
 
