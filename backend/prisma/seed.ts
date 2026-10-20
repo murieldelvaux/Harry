@@ -27,7 +27,7 @@ async function main() {
   // 2. Criar Usuário A (Muriel)
   const userA = await prisma.user.create({
     data: {
-      email: 'muriel@nexo.app',
+      email: 'muriel@harry.app',
       name: 'Muriel',
       passwordHash,
       phoneNumber: '+5511988881111',
@@ -38,7 +38,7 @@ async function main() {
   // 3. Criar Usuário B (Namorado)
   const userB = await prisma.user.create({
     data: {
-      email: 'parceiro@nexo.app',
+      email: 'parceiro@harry.app',
       name: 'Lucas',
       passwordHash,
       phoneNumber: '+5511977772222',
@@ -137,8 +137,8 @@ async function main() {
 
   console.log('✅ Seed finalizado com sucesso!');
   console.log(`Household Invite Code: ${household.inviteCode}`);
-  console.log(`Usuário 1: muriel@nexo.app / 123456`);
-  console.log(`Usuário 2: parceiro@nexo.app / 123456`);
+  console.log(`Usuário 1: muriel@harry.app / 123456`);
+  console.log(`Usuário 2: parceiro@harry.app / 123456`);
 }
 
 main()

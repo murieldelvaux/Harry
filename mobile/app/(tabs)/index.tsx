@@ -10,7 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { TransactionType } from '@nexo/shared';
+import { TransactionType } from '@harry/shared';
 import { useExpenses } from '../../src/hooks/useExpenses';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useHousehold } from '../../src/hooks/useHousehold';
@@ -337,8 +337,8 @@ export default function DashboardScreen() {
                             item.scope === 'SHARED'
                               ? theme.tagSharedBg
                               : item.scope === 'PRIVATE' && !!user?.id && item.userId !== user.id
-                              ? 'rgba(139, 92, 246, 0.15)'
-                              : theme.tagPrivateBg,
+                                ? 'rgba(139, 92, 246, 0.15)'
+                                : theme.tagPrivateBg,
                         },
                       ]}
                     >
@@ -350,16 +350,16 @@ export default function DashboardScreen() {
                               item.scope === 'SHARED'
                                 ? theme.tagSharedText
                                 : item.scope === 'PRIVATE' && !!user?.id && item.userId !== user.id
-                                ? '#8B5CF6'
-                                : theme.tagPrivateText,
+                                  ? '#8B5CF6'
+                                  : theme.tagPrivateText,
                           },
                         ]}
                       >
                         {item.scope === 'SHARED'
                           ? 'Casa'
                           : item.scope === 'PRIVATE' && !!user?.id && item.userId !== user.id
-                          ? `👁️ ${item.author?.name || 'Par'}`
-                          : 'Pessoal'}
+                            ? `👁️ ${item.author?.name || 'Par'}`
+                            : 'Pessoal'}
                       </Text>
                     </View>
                   </View>

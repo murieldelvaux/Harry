@@ -61,8 +61,8 @@ npm run start:dev
 A API estará rodando em `http://localhost:3000/api/v1`.
 
 > 💡 **Credenciais de Teste Geradas pelo Seed:**
-> - **Usuário 1 (Muriel):** `muriel@nexo.app` / `123456`
-> - **Usuário 2 (Parceiro):** `parceiro@nexo.app` / `123456`
+> - **Usuário 1 (Muriel):** `muriel@harry.app` / `123456`
+> - **Usuário 2 (Parceiro):** `parceiro@harry.app` / `123456`
 > - **Código de Convite do Casal:** `NEXO-2026`
 
 ---
