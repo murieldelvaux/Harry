@@ -10,7 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { TransactionType } from '@harry/shared';
+import { TransactionType } from '../../../packages/shared/src';
 import { useExpenses } from '../../src/hooks/useExpenses';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useHousehold } from '../../src/hooks/useHousehold';
