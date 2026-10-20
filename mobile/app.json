@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "Nexo",
-    "slug": "nexo",
+    "name": "Harry",
+    "slug": "harry",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "nexo",
+    "scheme": "harry",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": false,
@@ -19,7 +19,7 @@
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/nexo-logo.png"
+      "favicon": "./assets/harry-logo.png"
     },
     "plugins": [
       "expo-router",
@@ -27,7 +27,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/nexo-logo.png",
+          "icon": "./assets/harry-logo.png",
           "color": "#6366F1"
         }
       ]

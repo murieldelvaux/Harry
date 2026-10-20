@@ -124,7 +124,7 @@ export default function JoinHouseholdScreen() {
 
                 <Input
                   label="Código de Convite"
-                  placeholder="Ex: NEXO-7X8K"
+                  placeholder="Ex: HARRY-7X8K"
                   autoCapitalize="characters"
                   value={inviteCode}
                   onChangeText={setInviteCode}

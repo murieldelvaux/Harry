@@ -17,7 +17,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../hooks/useAuth';
 import { useHousehold } from '../hooks/useHousehold';
 
-const NexoLogo = require('../../assets/nexo-logo.png');
+const HarryLogo = require('../../assets/harry-logo.png');
 
 interface NavItem {
   id: string;
@@ -103,7 +103,7 @@ export function AppDrawer() {
       return;
     }
 
-    Alert.alert('Sair da Conta', 'Deseja realmente encerrar a sessão no Nexo?', [
+    Alert.alert('Sair da Conta', 'Deseja realmente encerrar a sessão no Harry?', [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Sair',
@@ -123,7 +123,7 @@ export function AppDrawer() {
       .slice(0, 2)
       .join('')
       .toUpperCase()
-    : 'NX';
+    : 'HY';
 
   return (
     <Modal
@@ -154,9 +154,9 @@ export function AppDrawer() {
           {/* HEADER DO MENU: LOGO & FECHAR */}
           <View style={[styles.header, { borderBottomColor: theme.border }]}>
             <View style={styles.brandRow}>
-              <Image source={NexoLogo} style={styles.logo} resizeMode="contain" />
+              <Image source={HarryLogo} style={styles.logo} resizeMode="contain" />
               <View style={{ flex: 1, paddingRight: 6 }}>
-                <Text style={[styles.brandTitle, { color: theme.textPrimary }]}>Nexo</Text>
+                <Text style={[styles.brandTitle, { color: theme.textPrimary }]}>Harry</Text>
                 <Text style={[styles.brandSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>
                   Gestão Inteligente individual e compartilhada
                 </Text>
@@ -183,7 +183,7 @@ export function AppDrawer() {
             )}
             <View style={styles.userInfo}>
               <Text style={[styles.userName, { color: theme.textPrimary }]} numberOfLines={1}>
-                {user?.name || 'Usuário Nexo'}
+                {user?.name || 'Usuário Harry'}
               </Text>
               <Text style={[styles.userEmail, { color: theme.textSecondary }]} numberOfLines={1}>
                 {user?.email || ''}
@@ -279,11 +279,11 @@ export function AppDrawer() {
               <View style={styles.assistantHeader}>
                 <Text style={styles.assistantIcon}>💬</Text>
                 <Text style={[styles.assistantTitle, { color: isDark ? '#34D399' : '#065F46' }]}>
-                  WhatsApp Integrado
+                  Assistente Harry no WhatsApp
                 </Text>
               </View>
               <Text style={[styles.assistantDesc, { color: isDark ? '#A7F3D0' : '#047857' }]}>
-                Envie fotos de comprovantes, notas fiscais ou áudios para registrar gastos e lembretes instantaneamente!
+                Comece sua mensagem com "Harry" para registrar gastos, agenda e compras instantaneamente!
               </Text>
             </View>
           </ScrollView>

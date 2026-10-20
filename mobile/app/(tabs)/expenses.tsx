@@ -284,7 +284,7 @@ export default function ExpensesScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <AppHeader title="Nexo" subtitle="Gastos & Extrato" />
+      <AppHeader title="Harry" subtitle="Gastos & Extrato" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* TÍTULO & BOTÃO NOVO GASTO */}

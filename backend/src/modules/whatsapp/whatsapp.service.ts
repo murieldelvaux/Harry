@@ -67,7 +67,7 @@ export class WhatsappService {
 
       if (!user) {
         await this.sendWhatsAppMessage(replyToPhone,
-          `Olá! 👋 Seu número (${fromNumber}) ainda não está vinculado a uma conta Nexo.\n\nAcesse o app e cadastre seu telefone em Perfil para começar a registrar gastos, metas e lembretes por aqui!`,
+          `Olá! 👋 Seu número (${fromNumber}) ainda não está vinculado a uma conta Harry.\n\nAcesse o app e cadastre seu telefone em Perfil para começar a registrar gastos, metas e lembretes por aqui!`,
         );
         return;
       }
@@ -77,14 +77,43 @@ export class WhatsappService {
       let mediaSourceLabel = '';
 
       if (messageType === 'text') {
-        const textBody = message.text?.body || '';
+        const textBody = (message.text?.body || '').trim();
         this.logger.log(`WhatsApp text received from ${fromNumber}: "${textBody}"`);
-        parsed = await this.aiParser.parseMessage(textBody);
+
+        const wakeCheck = this.checkWakeWord(textBody);
+        const firstName = user.name ? user.name.trim().split(' ')[0] : 'aí';
+
+        if (!wakeCheck.hasWakeWord) {
+          await this.sendWhatsAppMessage(
+            replyToPhone,
+            `👋 Olá, ${firstName}! Para que eu possa te ajudar, comece sua mensagem me chamando de *Harry* (como na Alexa! 🎙️).\n\n*Exemplos:*\n• _"Harry, gastei 50 no mercado"_\n• _"Harry, o que tenho na agenda hoje?"_\n• _"Harry, agendar dentista amanhã às 14h"_\n• _"Harry, lembrar de pagar o condomínio amanhã"_\n• _"Harry, adicionar leite na lista de compras"_`,
+            user.phoneNumber || undefined,
+          );
+          return;
+        }
+
+        if (!wakeCheck.commandText) {
+          await this.sendWhatsAppMessage(
+            replyToPhone,
+            `Oi, ${firstName}! Estou aqui. 👋 Como posso te ajudar hoje?\n\nVocê pode me pedir coisas como:\n• _"Harry, gastei 30 na farmácia"_\n• _"Harry, o que tenho para hoje?"_\n• _"Harry, agendar reunião amanhã às 15h"_\n• _"Harry, lembrar de pagar a conta de luz"_`,
+            user.phoneNumber || undefined,
+          );
+          return;
+        }
+
+        parsed = await this.aiParser.parseMessage(wakeCheck.commandText);
       } else if (messageType === 'image') {
         const mediaId = message.image?.id;
-        const caption = message.image?.caption || '';
+        let caption = message.image?.caption || '';
         const mimeType = message.image?.mime_type || 'image/jpeg';
         this.logger.log(`WhatsApp image received from ${fromNumber} (ID: ${mediaId}, caption: "${caption}")`);
+
+        if (caption) {
+          const wakeCheck = this.checkWakeWord(caption);
+          if (wakeCheck.hasWakeWord && wakeCheck.commandText) {
+            caption = wakeCheck.commandText;
+          }
+        }
 
         const media = await this.downloadMedia(mediaId);
         if (!media) {
@@ -177,7 +206,7 @@ export class WhatsappService {
         const sourceNotice = mediaSourceLabel ? ` (${mediaSourceLabel})` : '';
 
         await this.sendWhatsAppMessage(replyToPhone,
-          `✅ *Gasto Registrado!*${sourceNotice}\n\n📝 *Nome:* ${expense.description}\n💰 *Valor:* R$ ${formattedAmount}\n🏷️ *Escopo:* ${scopeLabel}\n\nJá sincronizado no seu app Nexo! 📲`,
+          `✅ *Gasto Registrado!*${sourceNotice}\n\n📝 *Nome:* ${expense.description}\n💰 *Valor:* R$ ${formattedAmount}\n🏷️ *Escopo:* ${scopeLabel}\n\nJá sincronizado no seu app Harry! 📲`,
         );
       } else if (parsed.intent === AIIntent.CREATE_GOAL && parsed.data.amount) {
         const goal = await this.prisma.goal.create({
@@ -204,7 +233,7 @@ export class WhatsappService {
         const sourceNotice = mediaSourceLabel ? ` (${mediaSourceLabel})` : '';
 
         await this.sendWhatsAppMessage(replyToPhone,
-          `🎯 *Meta Cadastrada!*${sourceNotice}\n\n🏷️ *Meta:* ${goal.title}\n💰 *Alvo:* R$ ${formattedAmount}\n👥 *Escopo:* ${scopeLabel}\n\nJá atualizado no seu painel de Metas no app Nexo! 📲`,
+          `🎯 *Meta Cadastrada!*${sourceNotice}\n\n🏷️ *Meta:* ${goal.title}\n💰 *Alvo:* R$ ${formattedAmount}\n👥 *Escopo:* ${scopeLabel}\n\nJá atualizado no seu painel de Metas no app Harry! 📲`,
         );
             } else if (parsed.intent === AIIntent.CREATE_SHOPPING_ITEM) {
         // Função para remover verbos e prefixos de comando do nome do item
@@ -274,7 +303,7 @@ export class WhatsappService {
 
         await this.sendWhatsAppMessage(
           replyToPhone,
-          `🛒 *Lista de Compras Atualizada!*${sourceNotice}\n\n${itemsText}\n\n🏷️ ${shoppingScopeLabel}\n\nJá sincronizado no app Nexo! Quando comprar, basta dar check no app! ✅📲`,
+          `🛒 *Lista de Compras Atualizada!*${sourceNotice}\n\n${itemsText}\n\n🏷️ ${shoppingScopeLabel}\n\nJá sincronizado no app Harry! Quando comprar, basta dar check no app! ✅📲`,
           user?.phoneNumber || undefined,
         );
 } else if (parsed.intent === AIIntent.CREATE_TASK) {
@@ -510,7 +539,7 @@ export class WhatsappService {
           .join("\n");
 
         await this.sendWhatsAppMessage(replyToPhone,
-          `📋 *Seus Lembretes & Tarefas Pendentes (${tasks.length}):*\n\n${lines}\n\n_Você também pode marcá-los como concluídos no app Nexo._`,
+          `📋 *Seus Lembretes & Tarefas Pendentes (${tasks.length}):*\n\n${lines}\n\n_Você também pode marcá-los como concluídos no app Harry._`,
         );
         return;
       } else if (parsed.intent === AIIntent.QUERY_SHOPPING_LIST) {
@@ -641,16 +670,27 @@ export class WhatsappService {
           : "";
 
         await this.sendWhatsAppMessage(replyToPhone,
-          `📅 *Compromisso Agendado!*${sourceNotice}\n\n👉 *${calendarEvent.title}*\n🗓️ *Data:* ${formattedDate}\n⏰ *Horário:* ${timeNotice}${locationNotice}\n🏷️ *Escopo:* ${scopeLabel}${syncNotice}\n\nVocê pode visualizá-lo e editá-lo no app Nexo! 📲`,
+          `📅 *Compromisso Agendado!*${sourceNotice}\n\n👉 *${calendarEvent.title}*\n🗓️ *Data:* ${formattedDate}\n⏰ *Horário:* ${timeNotice}${locationNotice}\n🏷️ *Escopo:* ${scopeLabel}${syncNotice}\n\nVocê pode visualizá-lo e editá-lo no app Harry! 📲`,
         );
       } else {
         await this.sendWhatsAppMessage(replyToPhone,
-          `🤔 Não consegui identificar os dados com clareza.\n\nExperimente:\n• Enviar foto de um comprovante ou cupom fiscal\n• Gravar um áudio dizendo: "Gastei 50 no mercado hoje"\n• Gravar um áudio: "Guardar 5000 na meta viagem"\n• Digitar: "Almoço 35"`,
+          `🤔 Não consegui identificar os dados com clareza.\n\nLembre-se de sempre começar me chamando de *Harry* (como na Alexa! 🎙️):\n• "Harry, gastei 50 no mercado hoje"\n• "Harry, o que tenho na agenda amanhã?"\n• "Harry, agendar dentista amanhã 14h"\n• "Harry, guardar 500 na meta viagem"\n• Ou envie a foto de um comprovante Pix ou cupom fiscal 📸`,
         );
       }
     } catch (error) {
       this.logger.error('Error handling WhatsApp message', error);
     }
+  }
+
+  private checkWakeWord(text: string): { hasWakeWord: boolean; commandText: string } {
+    const trimmed = (text || '').trim();
+    // Identifica a palavra de ativação "Harry", aceitando saudações comuns como "Oi Harry", "Ei Harry", "Olá Harry", etc.
+    const wakeRegex = /^(?:(?:oi|olá|ola|ei|hey|ok|fala|e aí|e ai)\s+)?harry\b[\s,.:!?-]*(.*)$/is;
+    const match = trimmed.match(wakeRegex);
+    if (!match) {
+      return { hasWakeWord: false, commandText: '' };
+    }
+    return { hasWakeWord: true, commandText: match[1]?.trim() || '' };
   }
 
   private async downloadMedia(mediaId: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
@@ -740,7 +780,7 @@ export class WhatsappService {
   async sendWelcomeMessage(toPhone: string, name?: string) {
     if (!toPhone) return;
     const firstName = name ? name.trim().split(' ')[0] : 'aí';
-    const welcomeText = `Olá, ${firstName}! 👋 Seja bem-vindo(a) ao Nexo! ✨\n\nA partir de agora você pode registrar gastos, tarefas e metas diretamente por aqui pelo WhatsApp.\n\nExperimente enviar:\n• "Gastei 45 no mercado"\n• Enviar a foto de um comprovante Pix ou cupom fiscal 📸\n• Mandar um áudio falando um gasto ou meta 🎙️\n• "Lembrar de pagar luz amanhã"`;
+    const welcomeText = `Olá, ${firstName}! 👋 Seja bem-vindo(a) ao *Harry*! ✨\n\nA partir de agora você pode gerenciar sua vida financeira, agenda, tarefas e compras diretamente por aqui pelo WhatsApp.\n\n🎙️ *Como falar comigo (Estilo Alexa):*\nSempre comece sua mensagem me chamando de *Harry*!\n\nExperimente enviar:\n• "Harry, gastei 45 no mercado"\n• "Harry, o que tenho na agenda hoje?"\n• "Harry, agendar dentista amanhã às 14h"\n• "Harry, lembrar de pagar o condomínio amanhã"\n• "Harry, adicionar café na lista de compras"\n• Ou envie a foto de um comprovante Pix ou cupom fiscal 📸`;
     await this.sendWhatsAppMessage(toPhone, welcomeText);
   }
 

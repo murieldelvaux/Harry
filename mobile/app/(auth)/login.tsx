@@ -20,7 +20,7 @@ import { GoogleButton } from '../../src/components/GoogleButton';
 import { useGoogleSignIn } from '../../src/hooks/useGoogleSignIn';
 import { GoogleConfigModal } from '../../src/components/GoogleConfigModal';
 
-const NexoLogo = require('../../assets/nexo-logo.png');
+const HarryLogo = require('../../assets/harry-logo.png');
 const { width } = Dimensions.get('window');
 
 // ─── Componente de campo inline premium ───────────────────────────────────────
@@ -167,11 +167,11 @@ export default function LoginScreen() {
           {/* ── Hero ── */}
           <View style={styles.hero}>
             <View style={styles.logoWrapper}>
-              <Image source={NexoLogo} style={styles.logoImage} resizeMode="contain" />
+              <Image source={HarryLogo} style={styles.logoImage} resizeMode="contain" />
             </View>
-            <Text style={styles.brand}>Nexo</Text>
+            <Text style={styles.brand}>Harry</Text>
             <Text style={styles.tagline}>
-              Finanças e rotina compartilhadas,{'\n'}conectados ao seu WhatsApp.
+              Finanças e rotina compartilhadas,{'\n'}conectadas ao assistente Harry.
             </Text>
           </View>
 
@@ -247,7 +247,7 @@ export default function LoginScreen() {
                 {isLoggingIn ? (
                   <Text style={styles.primaryBtnText}>Entrando…</Text>
                 ) : (
-                  <Text style={styles.primaryBtnText}>Entrar no Nexo →</Text>
+                  <Text style={styles.primaryBtnText}>Entrar no Harry →</Text>
                 )}
               </TouchableOpacity>
             </Animated.View>

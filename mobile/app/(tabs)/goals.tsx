@@ -215,7 +215,7 @@ export default function GoalsScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <AppHeader title="Nexo" subtitle="Metas Financeiras" />
+      <AppHeader title="Harry" subtitle="Metas Financeiras" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* TÍTULO & BOTÃO NOVA META */}

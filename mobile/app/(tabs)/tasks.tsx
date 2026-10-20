@@ -21,7 +21,7 @@ import { useTheme } from '../../src/theme/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import { maskDateTime } from '../../src/utils/format';
 
-const NexoLogo = require('../../assets/nexo-logo.png');
+const HarryLogo = require('../../assets/harry-logo.png');
 
 // ============================================================================
 // SISTEMA DE TEMAS DINÂMICO (LIGHT & DARK MODE - MATERIAL 3 & IOS HIG)
@@ -428,7 +428,7 @@ export default function TasksScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
 
-      <AppHeader title="Nexo" subtitle="Rotina & Lembretes" />
+      <AppHeader title="Harry" subtitle="Rotina & Lembretes" />
 
       {/* TÍTULO PRINCIPAL (iOS HIG TYPOGRAPHY) & CARDS DE RESUMO */}
       <View style={styles.titleSection}>

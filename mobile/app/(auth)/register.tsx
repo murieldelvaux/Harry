@@ -254,7 +254,7 @@ export default function RegisterScreen() {
               </View>
               <View>
                 <Text style={styles.title}>Criar sua conta</Text>
-                <Text style={styles.subtitle}>Você e o Lucas vão adorar o Nexo 💜</Text>
+                <Text style={styles.subtitle}>Gestão inteligente e compartilhada com o Harry 🪄</Text>
               </View>
             </View>
           </View>

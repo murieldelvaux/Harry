@@ -264,7 +264,7 @@ export class DailyBriefingService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    const message = `🌅 *Bom dia, ${firstName}! Aqui está seu Resumo Nexo de Hoje*
+    const message = `🌅 *Bom dia, ${firstName}! Aqui está seu Resumo Harry de Hoje*
 
 📅 *Compromissos & Agenda:*
 ${eventsBlock}
@@ -370,7 +370,7 @@ Tenha um dia muito produtivo e abençoado! ✨📱`;
         .join('\n');
     }
 
-    const message = `🗓️ *Seu Resumo ${label} Nexo!*
+    const message = `🗓️ *Seu Resumo ${label} Harry!*
 
 Olá, ${firstName}! Aqui está o panorama da sua semana:
 
@@ -380,7 +380,7 @@ ${eventsBlock}
 📌 *Tarefas & Prazos da Semana:*
 ${tasksBlock}
 
-Planeje sua semana com tranquilidade no app Nexo! 🚀`;
+Planeje sua semana com tranquilidade no app Harry! 🚀`;
 
     await this.whatsappService.sendWhatsAppMessage(user.phoneNumber, message);
   }

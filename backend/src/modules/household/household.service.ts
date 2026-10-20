@@ -22,7 +22,7 @@ export class HouseholdService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('Usuário não encontrado');
 
-    const inviteCode = 'NEXO-' + Math.random().toString(36).substring(2, 7).toUpperCase();
+    const inviteCode = 'HARRY-' + Math.random().toString(36).substring(2, 7).toUpperCase();
 
     const household = await this.prisma.household.create({
       data: {

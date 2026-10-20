@@ -3,7 +3,8 @@ import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-const TOKEN_KEY = 'nexo_auth_token';
+const TOKEN_KEY = 'harry_auth_token';
+const LEGACY_TOKEN_KEY = 'nexo_auth_token';
 
 // Usa variável de ambiente do Expo ou fallback local
 const rawUrl =
@@ -26,9 +27,14 @@ export const tokenStorage = {
   async getToken(): Promise<string | null> {
     try {
       if (Platform.OS === 'web') {
-        return typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
+        if (typeof window !== 'undefined') {
+          return localStorage.getItem(TOKEN_KEY) || localStorage.getItem(LEGACY_TOKEN_KEY);
+        }
+        return null;
       }
-      return await SecureStore.getItemAsync(TOKEN_KEY);
+      const token = await SecureStore.getItemAsync(TOKEN_KEY);
+      if (token) return token;
+      return await SecureStore.getItemAsync(LEGACY_TOKEN_KEY);
     } catch {
       return null;
     }
@@ -51,9 +57,11 @@ export const tokenStorage = {
       if (Platform.OS === 'web') {
         if (typeof window !== 'undefined') {
           localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(LEGACY_TOKEN_KEY);
         }
       } else {
         await SecureStore.deleteItemAsync(TOKEN_KEY);
+        await SecureStore.deleteItemAsync(LEGACY_TOKEN_KEY).catch(() => {});
       }
     } catch (e) {
       console.error('Erro ao deletar token', e);

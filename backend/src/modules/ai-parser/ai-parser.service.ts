@@ -141,8 +141,12 @@ export class AiParserService {
 
     // 1. Tentar via Gemini API com Structured Outputs e Fallback de Modelos
     if (this.genAI) {
-      const prompt = `Você é o assistente inteligente oficial do Nexo (gestão financeira, agenda e rotina pessoal/casal).
+      const prompt = `Você é o Harry, assistente inteligente oficial (gestão financeira, agenda, tarefas e rotina pessoal/casal).
 Data e hora atual de referência: ${referenceIso} (fuso horário de Brasília UTC-3).
+
+REGRA ALEXA DE ACIONAMENTO (WAKE WORD 'HARRY'):
+- O usuário aciona você chamando por "Harry" no início (como se faz com a Alexa).
+- Se a mensagem contiver o prefixo "Harry,", "Harry " ou saudações como "Oi Harry,", ignore essa palavra de ativação e processe o comando principal.
 
 Analise a mensagem em português e extraia as informações estruturadas.
 ATENÇÃO: Tenha total tolerância com linguagem falada informal, digitação rápida e erros de transcrição de áudio cotidianos (por exemplo: "gatei" = "gastei", "comprei", "paguei", "deu 15 reais", "fiz as unhas deu 15", etc.):
@@ -257,13 +261,14 @@ Mensagem: "${messageText}"`;
     }
 
     if (this.genAI) {
-      const prompt = `Você é o assistente inteligente multimodal do Nexo (gestão financeira, agenda e rotina pessoal/casal).
+      const prompt = `Você é o Harry, assistente inteligente multimodal pessoal e familiar (gestão financeira, agenda, tarefas e rotina).
 Data e hora atual de referência: ${referenceIso} (fuso horário de Brasília UTC-3).
 ${caption ? `Legenda da mensagem enviada pelo usuário: "${caption}"` : ""}
 
 Analise com precisão a mídia fornecida (pode ser foto de comprovante/recibo/cupom fiscal ou áudio de voz em português):
 
 ATENÇÃO CRÍTICA PARA TRANSCRIÇÃO DE ÁUDIO DE VOZ:
+- O usuário frequentemente inicia o áudio chamando pelo nome "Harry" (estilo Alexa, ex: "Harry, anota 50 de mercado", "Harry, o que tenho na agenda amanhã?"). Ignore a saudação/wake word "Harry" ao extrair o título e comando!
 - A voz do usuário em português do Brasil frequentemente tem pronúncias rápidas ou distorções comuns de gravação (ex: fala rápido "gatei" em vez de "gastei", "deu 15 na manicure", "dentista amanhã 13:10", etc.).
 - Interprete sempre a intenção semântica real do usuário com inteligência contextual!
 

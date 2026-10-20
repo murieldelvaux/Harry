@@ -204,7 +204,7 @@ export default function ProfileScreen() {
     try {
       await updatePhone(phoneNumber.trim());
       setPhoneSaved(true);
-      showMessage('Sucesso!', 'Seu WhatsApp foi vinculado ao assistente Nexo.');
+      showMessage('Sucesso!', 'Seu WhatsApp foi vinculado ao assistente Harry.');
     } catch {
       showMessage('Erro', 'Não foi possível salvar o número.');
     }
@@ -259,7 +259,7 @@ export default function ProfileScreen() {
     if (!household?.inviteCode) return;
     try {
       await Share.share({
-        message: `Oi! Entra comigo no Nexo para organizarmos nossas contas e tarefas juntos. Use nosso código de convite: ${household.inviteCode}`,
+        message: `Oi! Entra comigo no Harry para organizarmos nossas contas e tarefas juntos. Use nosso código de convite: ${household.inviteCode}`,
       });
     } catch (e) {
       console.error(e);
@@ -299,12 +299,12 @@ export default function ProfileScreen() {
       .slice(0, 2)
       .join('')
       .toUpperCase()
-    : 'NX';
+    : 'HY';
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       {/* HEADER PRINCIPAL COM HAMBÚRGUER & LOGO */}
-      <AppHeader title="Nexo" subtitle="Meu Perfil" />
+      <AppHeader title="Harry" subtitle="Meu Perfil" />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -333,7 +333,7 @@ export default function ProfileScreen() {
           <View style={styles.profileMeta}>
             <View style={styles.nameRow}>
               <Text style={[styles.profileName, { color: theme.textPrimary }]}>
-                {user?.name || 'Usuário Nexo'}
+                {user?.name || 'Usuário Harry'}
               </Text>
               <TouchableOpacity
                 onPress={() => {
@@ -376,10 +376,10 @@ export default function ProfileScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-                Assistente WhatsApp
+                Assistente Harry no WhatsApp
               </Text>
               <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-                Envie áudios, fotos de comprovantes e listas
+                Envie áudios, fotos e comandos começando com "Harry"
               </Text>
             </View>
           </View>
@@ -402,7 +402,7 @@ export default function ProfileScreen() {
 
           <View style={[styles.tipBanner, { backgroundColor: theme.surfaceSubtle }]}>
             <Text style={[styles.tipText, { color: theme.textSecondary }]}>
-              💡 <Text style={{ fontWeight: '700' }}>Dica:</Text> Você pode mandar áudios como <Text style={{ fontStyle: 'italic' }}>"Gastei 50 no mercado hoje"</Text>, foto de cupom fiscal, ou mandar fotos de listas de compras escritas no papel!
+              💡 <Text style={{ fontWeight: '700' }}>Como na Alexa:</Text> Sempre inicie suas mensagens com <Text style={{ fontWeight: '700', color: theme.primary }}>"Harry"</Text>! Ex: <Text style={{ fontStyle: 'italic' }}>"Harry, gastei 50 no mercado hoje"</Text>, <Text style={{ fontStyle: 'italic' }}>"Harry, agendar dentista amanhã às 14h"</Text> ou <Text style={{ fontStyle: 'italic' }}>"Harry, colocar café na lista"</Text>.
             </Text>
           </View>
         </View>
@@ -844,7 +844,7 @@ export default function ProfileScreen() {
         {/* SEÇÃO 4: INFORMAÇÕES & ENCERRAMENTO */}
         <View style={[styles.infoCard, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
           <Text style={[styles.infoTitle, { color: theme.textPrimary }]}>
-            Nexo — Versão 1.0.0
+            Harry — Versão 1.0.0
           </Text>
           <Text style={[styles.infoText, { color: theme.textSecondary }]}>
             Gestão financeira compartilhada, listas e assistente pessoal para o lar.

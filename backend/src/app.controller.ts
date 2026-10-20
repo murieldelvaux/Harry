@@ -15,7 +15,7 @@ export class AppController {
   getHealth() {
     return {
       status: 'ok',
-      service: 'Nexo Backend API',
+      service: 'Harry Backend API',
       version: '1.0.4',
       timestamp: new Date().toISOString(),
     };
@@ -27,7 +27,7 @@ export class AppController {
     let testResult: any = null;
     if (testPhone) {
       try {
-        await this.whatsappService.sendWhatsAppMessage(testPhone, '🧪 Mensagem de teste Nexo WhatsApp!');
+        await this.whatsappService.sendWhatsAppMessage(testPhone, '🧪 Mensagem de teste Harry WhatsApp!');
         testResult = { success: true, message: `Disparado para ${testPhone}` };
       } catch (e: any) {
         testResult = { success: false, error: e?.message };
