@@ -8,6 +8,7 @@ import {
   CreateExpenseDto,
   UpdateExpenseDto,
   RecordScope,
+  TransactionType,
   ExpenseCategory,
 } from '../../../../packages/shared/src';
 
@@ -31,6 +32,7 @@ export class ExpensesService {
       data: {
         description: dto.description,
         amount: dto.amount,
+        type: (dto.type as any) || TransactionType.EXPENSE,
         category: (dto.category as any) || ExpenseCategory.OTHER,
         scope: (dto.scope as any) || RecordScope.PRIVATE,
         date: dto.date ? new Date(dto.date) : new Date(),
@@ -53,6 +55,7 @@ export class ExpensesService {
       startDate?: string;
       endDate?: string;
       scope?: string;
+      type?: string;
       category?: string;
     },
   ) {
@@ -148,34 +151,53 @@ export class ExpensesService {
     });
 
     // Calcular Totais e Balanço
+    let totalIncome = 0;
+    let totalExpense = 0;
     let totalPrivate = 0;
     let partnerPrivate = 0;
     let totalShared = 0;
 
     for (const exp of expenses) {
       const val = Number(exp.amount);
-      if (exp.scope === RecordScope.PRIVATE) {
-        if (exp.userId === userId) {
-          totalPrivate += val;
-        } else {
-          partnerPrivate += val;
+      const isIncome = exp.type === TransactionType.INCOME;
+
+      if (isIncome) {
+        totalIncome += val;
+      } else {
+        totalExpense += val;
+        if (exp.scope === RecordScope.PRIVATE) {
+          if (exp.userId === userId) {
+            totalPrivate += val;
+          } else {
+            partnerPrivate += val;
+          }
+        } else if (exp.scope === RecordScope.SHARED) {
+          totalShared += val;
         }
-      } else if (exp.scope === RecordScope.SHARED) {
-        totalShared += val;
       }
     }
 
     const userShareOfShared = totalShared / 2;
+    const balance = totalIncome - totalExpense;
+
+    // Filtrar itens por tipo se especificado
+    let filteredItems = expenses;
+    if (filters?.type && filters.type !== 'ALL') {
+      filteredItems = expenses.filter((e) => e.type === filters.type);
+    }
 
     return {
       summary: {
+        totalIncome: Number(totalIncome.toFixed(2)),
+        totalExpense: Number(totalExpense.toFixed(2)),
+        balance: Number(balance.toFixed(2)),
         totalPrivate: Number(totalPrivate.toFixed(2)),
         totalShared: Number(totalShared.toFixed(2)),
         userShareOfShared: Number(userShareOfShared.toFixed(2)),
         partnerPrivate: Number(partnerPrivate.toFixed(2)),
         month: filters?.month || new Date().toISOString().slice(0, 7),
       },
-      items: expenses.map(this.mapExpense),
+      items: filteredItems.map(this.mapExpense),
     };
   }
 
@@ -241,6 +263,7 @@ export class ExpensesService {
       data: {
         ...(dto.description !== undefined && { description: dto.description }),
         ...(dto.amount !== undefined && { amount: dto.amount }),
+        ...(dto.type !== undefined && { type: dto.type as any }),
         ...(dto.category !== undefined && { category: dto.category as any }),
         ...(dto.scope !== undefined && { scope: dto.scope as any }),
         ...(householdId !== undefined && { householdId }),
@@ -270,6 +293,7 @@ export class ExpensesService {
       id: exp.id,
       description: exp.description,
       amount: Number(exp.amount),
+      type: exp.type || TransactionType.EXPENSE,
       category: exp.category,
       date: exp.date.toISOString(),
       scope: exp.scope,

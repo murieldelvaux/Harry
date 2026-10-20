@@ -1,0 +1,15 @@
+-- CreateEnum
+DO $$ BEGIN
+    CREATE TYPE "TransactionType" AS ENUM ('EXPENSE', 'INCOME');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- AlterEnum
+ALTER TYPE "ExpenseCategory" ADD VALUE IF NOT EXISTS 'SALARY';
+ALTER TYPE "ExpenseCategory" ADD VALUE IF NOT EXISTS 'INVESTMENT';
+ALTER TYPE "ExpenseCategory" ADD VALUE IF NOT EXISTS 'FREELANCE';
+ALTER TYPE "ExpenseCategory" ADD VALUE IF NOT EXISTS 'SALE';
+
+-- AlterTable
+ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "type" "TransactionType" NOT NULL DEFAULT 'EXPENSE';

@@ -12,6 +12,11 @@ enum RecordScope {
   SHARED
 }
 
+enum TransactionType {
+  EXPENSE
+  INCOME
+}
+
 enum ExpenseCategory {
   HOUSING
   FOOD_MARKET
@@ -21,6 +26,10 @@ enum ExpenseCategory {
   LEISURE
   UTILITIES
   SUBSCRIPTIONS
+  SALARY
+  INVESTMENT
+  FREELANCE
+  SALE
   OTHER
 }
 
@@ -91,6 +100,7 @@ model Expense {
   id          String          @id @default(uuid())
   description String
   amount      Decimal         @db.Decimal(10, 2)
+  type        TransactionType @default(EXPENSE)
   category    ExpenseCategory @default(OTHER)
   date        DateTime        @default(now())
   scope       RecordScope     @default(PRIVATE)

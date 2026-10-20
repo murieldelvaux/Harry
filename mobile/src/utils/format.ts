@@ -37,6 +37,10 @@ export function getCategoryLabel(category: string): string {
     LEISURE: '🎉 Lazer & Viagem',
     UTILITIES: '💡 Contas & Luz',
     SUBSCRIPTIONS: '📱 Assinaturas',
+    SALARY: '💼 Salário & Renda',
+    INVESTMENT: '📈 Investimentos',
+    FREELANCE: '⚡ Freelance & Extra',
+    SALE: '🏷️ Venda de Item',
     OTHER: '📦 Outros',
   };
   return map[category] || '📦 Outros';

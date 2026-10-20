@@ -6,6 +6,7 @@ import {
   AIIntent,
   ExpenseCategory,
   RecordScope,
+  TransactionType,
   ParsedWhatsAppResultDto,
 } from "../../../../packages/shared/src";
 
@@ -45,6 +46,10 @@ export class AiParserService {
           properties: {
             title: { type: SchemaType.STRING },
             amount: { type: SchemaType.NUMBER },
+            transactionType: {
+              type: SchemaType.STRING,
+              enum: [TransactionType.EXPENSE, TransactionType.INCOME],
+            },
             category: {
               type: SchemaType.STRING,
               enum: [
@@ -55,6 +60,10 @@ export class AiParserService {
                 ExpenseCategory.LEISURE,
                 ExpenseCategory.UTILITIES,
                 ExpenseCategory.SUBSCRIPTIONS,
+                ExpenseCategory.SALARY,
+                ExpenseCategory.INVESTMENT,
+                ExpenseCategory.FREELANCE,
+                ExpenseCategory.SALE,
                 ExpenseCategory.OTHER,
               ],
             },
@@ -177,13 +186,17 @@ REGRA DE OURO SOBRE ESCOPO (PRIVADO vs COMPARTILHADO):
 - "location": local se mencionado.
 - "scope": defina conforme a REGRA DE OURO SOBRE ESCOPO acima (SHARED se tiver 'compartilhado', senão PRIVATE).
 
-2. GASTOS E DESPESAS (CREATE_EXPENSE):
-- Qualquer gasto ou pagamento realizado (ex: "Gatei 15 reais na manicure", "gastei 15 na manicure", "deu 15 na manicure", "paguei 30 no almoço", "Uber 25", "Farmácia 40"):
-  Classifique OBRIGATORIAMENTE como CREATE_EXPENSE!
-  Tolerância fonética e coloquial: "gatei", "gastei", "comprei", "paguei", "deu", "custou".
-- "amount": valor numérico gasto (ex: 15).
-- "title": descrição limpa do gasto (ex: "Manicure", "Almoço", "Uber"). Remova a palavra "compartilhado" se falada no fim.
-- "category": categoria mais adequada (HEALTH para manicure/estética/remédio/médico, RESTAURANT para almoço/jantar, TRANSPORTATION para uber/gasolina, FOOD_MARKET para mercado, etc.).
+2. TRANSAÇÕES FINANCEIRAS - GASTOS E GANHOS (CREATE_EXPENSE):
+- GASTOS / SAÍDAS: Qualquer gasto, despesa, compra ou pagamento realizado (ex: "Gastei 15 na manicure", "comprei pão 10", "paguei 30 no almoço", "Uber 25", "Farmácia 40"):
+  - "transactionType": "EXPENSE"
+  - "amount": valor numérico gasto (ex: 15).
+  - "title": descrição limpa do gasto (ex: "Manicure", "Almoço", "Uber"). Remova a palavra "compartilhado" se falada no fim.
+  - "category": categoria de despesa adequada (HEALTH para manicure/estética/remédio/médico, RESTAURANT para almoço/jantar, TRANSPORTATION para uber/gasolina, FOOD_MARKET para mercado, UTILITIES para contas, etc.).
+- GANHOS / ENTRADAS: Qualquer dinheiro que entrou, recebido, salário, comissão, freelance, venda de algo ou rendimento (ex: "Recebi 5000 de salário", "Caiu meu salário de 4500", "Vendi minha bicicleta por 350", "Recebi 800 de freela", "Entrou 200 de pix de devolução"):
+  - "transactionType": "INCOME"
+  - "amount": valor numérico recebido (ex: 5000).
+  - "title": descrição limpa da origem (ex: "Salário", "Venda de bicicleta", "Freelance", "Pix recebido").
+  - "category": categoria de ganho (SALARY para salário/holerite, SALE para venda de itens, FREELANCE para extras/bicos/comissões, INVESTMENT para rendimentos/dividendos, ou OTHER).
 - "scope": defina conforme a REGRA DE OURO SOBRE ESCOPO acima (SHARED se tiver 'compartilhado', senão PRIVATE).
 - NUNCA classifique como CREATE_EXPENSE se houver a palavra "meta", "poupar" ou "guardar".
 
@@ -278,13 +291,21 @@ REGRA DE OURO SOBRE ESCOPO:
 - Caso contrário, defina "PRIVATE".
 
 DIRETRIZES DE RECONHECIMENTO:
-1. GASTOS E COMPRAS (CREATE_EXPENSE):
-   - Se for foto de comprovante Pix, recibo de máquina de cartão, cupom fiscal, fatura ou nota fiscal: extraia valor total, nome do estabelecimento e categoria.
-   - Se for áudio onde a pessoa fala sobre um gasto, pagamento ou compra (ex: "Gatei 15 reais na manicure", "gastei 15 na manicure", "deu 15 na manicure", "Gastei 60 no mercado", "Almoço 35", "Farmácia 40"):
+1. TRANSAÇÕES FINANCEIRAS - GASTOS E GANHOS (CREATE_EXPENSE):
+   - Se for foto de comprovante Pix, recibo de máquina de cartão, cupom fiscal, fatura ou nota fiscal: extraia valor total, nome do estabelecimento e defina transactionType: "EXPENSE".
+   - Se for foto de comprovante Pix recebido ou holerite de salário: defina transactionType: "INCOME".
+   - Se for áudio onde a pessoa fala sobre um gasto, pagamento ou compra (ex: "Gastei 15 reais na manicure", "gastei 60 no mercado", "almoço 35"):
      - intent: "CREATE_EXPENSE"
+     - transactionType: "EXPENSE"
      - amount: o valor numérico mencionado (ex: 15).
      - title: o que foi gasto (ex: "Manicure", "Mercado", "Almoço").
-     - category: a categoria correspondente (HEALTH para manicure/beleza/saúde, RESTAURANT para refeições, FOOD_MARKET para mercado, etc.).
+     - category: a categoria correspondente (HEALTH, RESTAURANT, FOOD_MARKET, etc.).
+   - Se for áudio onde a pessoa fala sobre um ganho, entrada, salário, venda ou freelance (ex: "Recebi 5000 de salário", "Vendi o armário por 200", "Entrou 300 de freela"):
+     - intent: "CREATE_EXPENSE"
+     - transactionType: "INCOME"
+     - amount: o valor numérico mencionado (ex: 5000).
+     - title: origem limpa do ganho (ex: "Salário", "Venda de armário", "Freelance").
+     - category: SALARY para salário, SALE para vendas, FREELANCE para bicos/extras, INVESTMENT para investimentos, ou OTHER.
 
 2. COMPROMISSOS E EVENTOS DE AGENDA (CREATE_EVENT):
    - Se o áudio for para agendar compromisso, consulta, dentista, médico ou reunião (ex: "Agendar dentista amanhã as 13:10", "Dentista amanhã às 13:10", "Marcar consulta amanhã às 14 horas", "Adicionar dentista na minha agenda"):
@@ -770,26 +791,41 @@ DIRETRIZES DE RECONHECIMENTO:
       };
     }
 
-    // 3. Detecção de Gasto
+    // 3. Detecção de Transação Financeira (Gasto ou Ganho)
     if (amount !== undefined) {
+      const isIncome = /\b(?:recebi|ganhei|sal[aá]rio|vendi|venda|comiss[aã]o|rendimento|freela(?:nce)?|entrou|pix recebido|pagaram)\b/i.test(lower);
+      const transactionType = isIncome ? TransactionType.INCOME : TransactionType.EXPENSE;
+
       let category = ExpenseCategory.OTHER;
-      if (lower.includes("mercado") || lower.includes("compras") || lower.includes("feira") || lower.includes("supermercado")) {
-        category = ExpenseCategory.FOOD_MARKET;
-      } else if (lower.includes("almoc") || lower.includes("jantar") || lower.includes("restaurante") || lower.includes("ifood") || lower.includes("lanche") || lower.includes("pizza") || lower.includes("cafe")) {
-        category = ExpenseCategory.RESTAURANT;
-      } else if (lower.includes("uber") || lower.includes("gasolina") || lower.includes("metro") || lower.includes("transporte") || lower.includes("onibus") || lower.includes("posto")) {
-        category = ExpenseCategory.TRANSPORTATION;
-      } else if (lower.includes("farmacia") || lower.includes("medico") || lower.includes("remedio") || lower.includes("manicure") || lower.includes("salao") || lower.includes("unha") || lower.includes("cabelo") || lower.includes("barba") || lower.includes("estetica")) {
-        category = ExpenseCategory.HEALTH;
-      } else if (lower.includes("luz") || lower.includes("agua") || lower.includes("internet") || lower.includes("energia") || lower.includes("aluguel") || lower.includes("condominio")) {
-        category = ExpenseCategory.UTILITIES;
+      if (isIncome) {
+        if (lower.includes("salario") || lower.includes("salário") || lower.includes("holerite")) {
+          category = ExpenseCategory.SALARY;
+        } else if (lower.includes("venda") || lower.includes("vendi")) {
+          category = ExpenseCategory.SALE;
+        } else if (lower.includes("freela") || lower.includes("bico") || lower.includes("comissao") || lower.includes("comissão")) {
+          category = ExpenseCategory.FREELANCE;
+        } else if (lower.includes("investimento") || lower.includes("rendimento") || lower.includes("dividendo")) {
+          category = ExpenseCategory.INVESTMENT;
+        }
+      } else {
+        if (lower.includes("mercado") || lower.includes("compras") || lower.includes("feira") || lower.includes("supermercado")) {
+          category = ExpenseCategory.FOOD_MARKET;
+        } else if (lower.includes("almoc") || lower.includes("jantar") || lower.includes("restaurante") || lower.includes("ifood") || lower.includes("lanche") || lower.includes("pizza") || lower.includes("cafe")) {
+          category = ExpenseCategory.RESTAURANT;
+        } else if (lower.includes("uber") || lower.includes("gasolina") || lower.includes("metro") || lower.includes("transporte") || lower.includes("onibus") || lower.includes("posto")) {
+          category = ExpenseCategory.TRANSPORTATION;
+        } else if (lower.includes("farmacia") || lower.includes("medico") || lower.includes("remedio") || lower.includes("manicure") || lower.includes("salao") || lower.includes("unha") || lower.includes("cabelo") || lower.includes("barba") || lower.includes("estetica")) {
+          category = ExpenseCategory.HEALTH;
+        } else if (lower.includes("luz") || lower.includes("agua") || lower.includes("internet") || lower.includes("energia") || lower.includes("aluguel") || lower.includes("condominio")) {
+          category = ExpenseCategory.UTILITIES;
+        }
       }
 
       let title = text
-        .replace(/(?:gastei|gatei|paguei|comprei|valor|r\$|\d+(?:[.,]\d{1,2})?|reais|compartilhad[ao]|privad[ao]|(?:na|no|em|pra|para)\s+)/gi, " ")
+        .replace(/(?:gastei|gatei|paguei|comprei|recebi|ganhei|sal[aá]rio|vendi|entrou|valor|r\$|\d+(?:[.,]\d{1,2})?|reais|compartilhad[ao]|privad[ao]|(?:na|no|em|pra|para|de)\s+)/gi, " ")
         .replace(/\s+/g, " ")
         .trim();
-      if (!title) title = "Gasto via WhatsApp";
+      if (!title) title = isIncome ? "Ganho via WhatsApp" : "Gasto via WhatsApp";
 
       return {
         intent: AIIntent.CREATE_EXPENSE,
@@ -797,6 +833,7 @@ DIRETRIZES DE RECONHECIMENTO:
         data: {
           title: title.charAt(0).toUpperCase() + title.slice(1),
           amount,
+          transactionType,
           category,
           scope,
         },

@@ -4,22 +4,37 @@
     "slug": "harry",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/harry-logo.png",
     "scheme": "harry",
     "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/harry-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B0D12"
+    },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.nexo.couple",
+      "bundleIdentifier": "app.harry.couple",
+      "icon": "./assets/harry-logo.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "app.nexo.couple"
+      "package": "app.harry.couple",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0B0D12"
+      }
     },
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/harry-logo.png"
+      "favicon": "./assets/harry-logo.png",
+      "name": "Harry",
+      "shortName": "Harry",
+      "backgroundColor": "#0B0D12",
+      "themeColor": "#0B0D12"
     },
     "plugins": [
       "expo-router",
