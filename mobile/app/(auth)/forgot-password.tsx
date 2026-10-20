@@ -328,7 +328,7 @@ export default function ForgotPasswordScreen() {
 
                 <Text style={styles.title}>Senha Alterada!</Text>
                 <Text style={[styles.subtitle, { textAlign: 'center', marginBottom: 24 }]}>
-                  Sua senha foi redefinida com sucesso. Você já pode fazer login na sua conta Nexo.
+                  Sua senha foi redefinida com sucesso. Você já pode fazer login na sua conta Harry.
                 </Text>
 
                 <TouchableOpacity

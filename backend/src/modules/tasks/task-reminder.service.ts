@@ -88,7 +88,7 @@ export class TaskReminderService implements OnModuleInit, OnModuleDestroy {
             const isShared = task.scope === 'SHARED';
             const scopeTag = isShared ? '🏠 Lembrete Compartilhado' : '🔒 Lembrete Pessoal';
 
-            const message = `🔔 *Lembrete Nexo!*\n\nOlá, ${firstName}! Vim te lembrar do compromisso:\n👉 *${task.title}*\n${scopeTag}\n\n${detailTime}\n\n✅ Não se esqueça! Você pode visualizá-lo e marcar como concluído pelo app Nexo.`;
+            const message = `🔔 *Lembrete Harry!*\n\nOlá, ${firstName}! Vim te lembrar do compromisso:\n👉 *${task.title}*\n${scopeTag}\n\n${detailTime}\n\n✅ Não se esqueça! Você pode visualizá-lo e marcar como concluído pelo app Harry.`;
 
             await this.whatsappService.sendWhatsAppMessage(task.user.phoneNumber, message);
           }

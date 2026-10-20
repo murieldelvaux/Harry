@@ -40,7 +40,7 @@ export default function DashboardScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       {/* HEADER PRINCIPAL COM MENU LATERAL HAMBÚRGUER & LOGO */}
       <AppHeader
-        title="Nexo"
+        title="Harry"
         subtitle={household?.name ? `🏠 ${household.name}` : 'Visão Geral do Lar'}
       />
 

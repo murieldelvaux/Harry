@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
-const DAILY_BRIEFING_ID = 'nexo_daily_briefing';
+const DAILY_BRIEFING_ID = 'harry_daily_briefing';
 
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
@@ -37,7 +37,7 @@ export const notificationService = {
 
       if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync('default', {
-          name: 'Resumo Diário Nexo',
+          name: 'Resumo Diário Harry',
           importance: Notifications.AndroidImportance.HIGH,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#6366F1',
@@ -72,8 +72,8 @@ export const notificationService = {
       await Notifications.scheduleNotificationAsync({
         identifier: DAILY_BRIEFING_ID,
         content: {
-          title: '🌅 Bom dia! Seu Resumo Nexo',
-          body: 'Seus compromissos de hoje, tarefas e lista de compras já estão prontos.',
+          title: '🌅 Bom dia! Seu Resumo Harry',
+          body: 'Seus compromissos de hoje, tarefas e lista de compras já estão prontos com o Harry.',
           data: { url: '/calendar' },
           sound: true,
         },
@@ -115,10 +115,10 @@ export const notificationService = {
 
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: '🔔 Resumo Nexo (Teste)',
+          title: '🔔 Resumo Harry (Teste)',
           body:
             customBody ||
-            'Tudo certo! Suas notificações matinais de agenda, tarefas e compras estão ativas.',
+            'Tudo certo! Suas notificações matinais de agenda, tarefas e compras do Harry estão ativas.',
           data: { url: '/calendar' },
           sound: true,
         },

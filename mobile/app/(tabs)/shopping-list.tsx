@@ -306,7 +306,7 @@ export default function ShoppingListScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <AppHeader title="Nexo" subtitle="Lista de Compras" />
+      <AppHeader title="Harry" subtitle="Lista de Compras" />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -458,7 +458,7 @@ export default function ShoppingListScreen() {
         >
           <Text style={{ fontSize: 16 }}>🛒</Text>
           <Text style={[styles.whatsappBannerText, { color: isDark ? '#A7F3D0' : '#047857' }]}>
-            <Text style={{ fontWeight: '700' }}>Adicione pelo WhatsApp:</Text> Mande foto de uma lista no papel, planilha, áudio ou texto e a IA inclui automaticamente!
+            <Text style={{ fontWeight: '700' }}>Adicione com o Harry:</Text> Mande mensagem dizendo "Harry, colocar café na lista..." ou envie áudio e foto de lista no papel!
           </Text>
         </View>
 

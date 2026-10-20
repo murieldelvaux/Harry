@@ -562,7 +562,7 @@ export default function CalendarScreen() {
               <Text style={[styles.syncSubtitle, { color: theme.textSecondary }]}>
                 {hasGoogleConnected
                   ? "Sincronização bidirecional ativa em tempo real."
-                  : "Autorize o acesso para sincronizar compromissos entre o Nexo e sua agenda."}
+                  : "Autorize o acesso para sincronizar compromissos entre o Harry e sua agenda."}
               </Text>
 
               {syncStatusMsg || googleAuthStatus ? (
@@ -808,7 +808,7 @@ export default function CalendarScreen() {
                 Dia livre ou sem eventos
               </Text>
               <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>
-                Você pode adicionar eventos por aqui ou enviar áudio, foto de convite ou mensagem no WhatsApp do Nexo!
+                Você pode adicionar eventos por aqui ou enviar mensagem no WhatsApp dizendo "Harry, agendar consulta amanhã às 14h"!
               </Text>
             </View>
           ) : (

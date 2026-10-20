@@ -9,7 +9,7 @@ import {
 import { useDrawer } from '../context/DrawerContext';
 import { useTheme } from '../theme/ThemeContext';
 
-const NexoLogo = require('../../assets/nexo-logo.png');
+const HarryLogo = require('../../assets/harry-logo.png');
 
 interface AppHeaderProps {
   title?: string;
@@ -34,10 +34,10 @@ export function AppHeader({ title, subtitle, rightAction }: AppHeaderProps) {
         </TouchableOpacity>
 
         <TouchableOpacity onPress={openDrawer} style={styles.brandRow} activeOpacity={0.8}>
-          <Image source={NexoLogo} style={styles.logo} resizeMode="contain" />
+          <Image source={HarryLogo} style={styles.logo} resizeMode="contain" />
           <View>
             <Text style={[styles.brandTitle, { color: theme.textPrimary }]}>
-              {title || 'Nexo'}
+              {title || 'Harry'}
             </Text>
             {subtitle ? (
               <Text style={[styles.brandSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>

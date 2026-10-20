@@ -2,7 +2,7 @@
   "name": "nexo-monorepo",
   "version": "1.0.0",
   "private": true,
-  "description": "Nexo — Assistente pessoal e financeiro compartilhado, com ingestão via WhatsApp",
+  "description": "Harry — Assistente pessoal e financeiro inteligente, com ingestão via WhatsApp",
   "workspaces": [
     "packages/*",
     "backend",

@@ -26,10 +26,10 @@ export class MailService {
   }
 
   async sendPasswordResetCode(to: string, name: string, code: string) {
-    const subject = 'Seu código para redefinir a senha do Nexo';
+    const subject = 'Seu código para redefinir a senha do Harry';
     const html = `
       <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:auto;padding:24px;background:#0B0D12;color:#fff;border-radius:16px">
-        <h2 style="margin:0 0 8px">Nexo</h2>
+        <h2 style="margin:0 0 8px">Harry</h2>
         <p>Olá, ${name}!</p>
         <p>Use o código abaixo para redefinir sua senha. Ele vale por 15 minutos.</p>
         <p style="font-size:34px;font-weight:800;letter-spacing:8px;background:#161A22;padding:16px;text-align:center;border-radius:12px;color:#0A84FF">${code}</p>
@@ -42,11 +42,11 @@ export class MailService {
     }
     try {
       await this.transporter.sendMail({
-        from: process.env.SMTP_FROM || `Nexo <${process.env.SMTP_USER}>`,
+        from: process.env.SMTP_FROM || `Harry <${process.env.SMTP_USER}>`,
         to,
         subject,
         html,
-        text: `Seu código de redefinição de senha do Nexo: ${code} (válido por 15 minutos).`,
+        text: `Seu código de redefinição de senha do Harry: ${code} (válido por 15 minutos).`,
       });
       this.logger.log(`E-mail de recuperação enviado para ${to}`);
     } catch (err) {
