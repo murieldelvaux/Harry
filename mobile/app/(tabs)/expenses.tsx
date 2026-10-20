@@ -21,11 +21,31 @@ import { AppHeader } from '../../src/components/AppHeader';
 import { useExpenses } from '../../src/hooks/useExpenses';
 import { useAuth } from '../../src/hooks/useAuth';
 import { formatCurrency, formatDate, getCategoryLabel, maskCurrency, unmaskCurrency, maskDate } from '../../src/utils/format';
-import { ExpenseCategory, RecordScope, ExpenseDto } from '../../../packages/shared/src';
+import { ExpenseCategory, RecordScope, TransactionType, ExpenseDto } from '../../../packages/shared/src';
 
 const MONTH_NAMES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+];
+
+const INCOME_CATEGORIES: ExpenseCategory[] = [
+  ExpenseCategory.SALARY,
+  ExpenseCategory.SALE,
+  ExpenseCategory.FREELANCE,
+  ExpenseCategory.INVESTMENT,
+  ExpenseCategory.OTHER,
+];
+
+const EXPENSE_CATEGORIES: ExpenseCategory[] = [
+  ExpenseCategory.FOOD_MARKET,
+  ExpenseCategory.RESTAURANT,
+  ExpenseCategory.HOUSING,
+  ExpenseCategory.TRANSPORTATION,
+  ExpenseCategory.HEALTH,
+  ExpenseCategory.UTILITIES,
+  ExpenseCategory.SUBSCRIPTIONS,
+  ExpenseCategory.LEISURE,
+  ExpenseCategory.OTHER,
 ];
 
 export default function ExpensesScreen() {
@@ -43,6 +63,7 @@ export default function ExpensesScreen() {
   const [calendarPickerVisible, setCalendarPickerVisible] = useState(false);
 
   const [activeScope, setActiveScope] = useState<'ALL' | 'SHARED' | 'PRIVATE' | 'PARTNER'>('ALL');
+  const [activeType, setActiveType] = useState<'ALL' | 'EXPENSE' | 'INCOME'>('ALL');
 
   // Modals
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -52,6 +73,7 @@ export default function ExpensesScreen() {
   // Form State (Create / Edit)
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
+  const [transactionType, setTransactionType] = useState<TransactionType>(TransactionType.EXPENSE);
   const [category, setCategory] = useState<ExpenseCategory>(ExpenseCategory.FOOD_MARKET);
   const [scope, setScope] = useState<RecordScope>(RecordScope.PRIVATE);
   const [customDate, setCustomDate] = useState('');
@@ -79,6 +101,7 @@ export default function ExpensesScreen() {
         endDate: appliedPeriod.end,
       }),
     scope: backendScope,
+    type: activeType === 'ALL' ? undefined : activeType,
   });
 
   const expenses = useMemo(() => {
@@ -155,7 +178,9 @@ export default function ExpensesScreen() {
   const handleOpenCreate = () => {
     setDescription('');
     setAmount('');
-    setCategory(ExpenseCategory.FOOD_MARKET);
+    const initialType = activeType === 'INCOME' ? TransactionType.INCOME : TransactionType.EXPENSE;
+    setTransactionType(initialType);
+    setCategory(initialType === TransactionType.INCOME ? ExpenseCategory.SALARY : ExpenseCategory.FOOD_MARKET);
     setScope(RecordScope.PRIVATE);
     setCustomDate('');
     setCreateModalVisible(true);
@@ -166,6 +191,7 @@ export default function ExpensesScreen() {
     setEditingExpense(item);
     setDescription(item.description);
     setAmount(maskCurrency(item.amount));
+    setTransactionType(item.type || TransactionType.EXPENSE);
     setCategory(item.category);
     setScope(item.scope);
     const d = new Date(item.date);
@@ -192,13 +218,14 @@ export default function ExpensesScreen() {
       await createExpense({
         description: description.trim(),
         amount: numAmount,
+        type: transactionType,
         category,
         scope,
         date: isoDate,
       });
       setCreateModalVisible(false);
     } catch {
-      Alert.alert('Erro', 'Não foi possível salvar o gasto.');
+      Alert.alert('Erro', `Não foi possível salvar o ${transactionType === TransactionType.INCOME ? 'ganho' : 'gasto'}.`);
     }
   };
 
@@ -223,6 +250,7 @@ export default function ExpensesScreen() {
         dto: {
           description: description.trim(),
           amount: numAmount,
+          type: transactionType,
           category,
           scope,
           ...(isoDate && { date: isoDate }),
@@ -231,7 +259,7 @@ export default function ExpensesScreen() {
       setEditModalVisible(false);
       setEditingExpense(null);
     } catch {
-      Alert.alert('Erro', 'Não foi possível atualizar o gasto.');
+      Alert.alert('Erro', `Não foi possível atualizar o ${transactionType === TransactionType.INCOME ? 'ganho' : 'gasto'}.`);
     }
   };
 
@@ -282,15 +310,29 @@ export default function ExpensesScreen() {
     (summary?.totalPrivate || 0) +
     (summary?.partnerPrivate || 0);
 
+  const balance = summary?.balance ?? 0;
+  const totalIncome = summary?.totalIncome ?? 0;
+  const totalExpense = summary?.totalExpense ?? totalGeral;
+  const isPositiveBalance = balance >= 0;
+
+  const incomeCount = useMemo(
+    () => rawExpenses?.filter((e) => e.type === TransactionType.INCOME).length || 0,
+    [rawExpenses]
+  );
+  const expenseCount = useMemo(
+    () => rawExpenses?.filter((e) => e.type !== TransactionType.INCOME).length || 0,
+    [rawExpenses]
+  );
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <AppHeader title="Harry" subtitle="Gastos & Extrato" />
+      <AppHeader title="Harry" subtitle="Financeiro & Extrato" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* TÍTULO & BOTÃO NOVO GASTO */}
         <View style={styles.headerTop}>
           <View>
-            <Text style={[styles.title, { color: theme.textPrimary }]}>Gastos & Extrato</Text>
+            <Text style={[styles.title, { color: theme.textPrimary }]}>Financeiro & Extrato</Text>
             <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
               {filterMode === 'MONTH'
                 ? `${MONTH_NAMES[selectedMonth - 1]} de ${selectedYear}`
@@ -310,28 +352,85 @@ export default function ExpensesScreen() {
             theme.cardShadow,
           ]}
         >
+          {/* TOPO: BALANÇO / SALDO LÍQUIDO */}
           <View style={styles.summaryTopRow}>
-            <Text style={[styles.summaryTopLabel, { color: theme.textSecondary }]}>
-              Total no Período
-            </Text>
-            <Text style={[styles.summaryTopValue, { color: theme.textPrimary }]}>
-              {formatCurrency(totalGeral)}
-            </Text>
+            <View>
+              <Text style={[styles.summaryTopLabel, { color: theme.textSecondary }]}>
+                Balanço Líquido (Saldo)
+              </Text>
+              <Text
+                style={[
+                  styles.summaryTopValue,
+                  { color: isPositiveBalance ? (isDark ? '#34D399' : '#059669') : '#EF4444' },
+                ]}
+              >
+                {isPositiveBalance ? `+ ${formatCurrency(balance)}` : `- ${formatCurrency(Math.abs(balance))}`}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.balancePill,
+                {
+                  backgroundColor: isPositiveBalance
+                    ? 'rgba(16, 185, 129, 0.12)'
+                    : 'rgba(239, 68, 68, 0.12)',
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.balancePillText,
+                  { color: isPositiveBalance ? '#10B981' : '#EF4444' },
+                ]}
+              >
+                {isPositiveBalance ? '🟢 Superávit' : '🔴 Déficit'}
+              </Text>
+            </View>
           </View>
 
+          {/* MEIO: ENTRADAS (GANHOS) & SAÍDAS (GASTOS) */}
+          <View style={[styles.inOutStatsRow, { borderTopColor: theme.border }]}>
+            <View style={styles.inOutStatItem}>
+              <View style={styles.inOutLabelRow}>
+                <Text style={{ fontSize: 13 }}>↗️</Text>
+                <Text style={[styles.inOutStatLabel, { color: theme.textSecondary }]}>
+                  Entradas (Ganhos)
+                </Text>
+              </View>
+              <Text style={[styles.inOutStatValue, { color: isDark ? '#34D399' : '#059669' }]}>
+                + {formatCurrency(totalIncome)}
+              </Text>
+            </View>
+
+            <View style={[styles.verticalDivider, { backgroundColor: theme.border }]} />
+
+            <View style={styles.inOutStatItem}>
+              <View style={styles.inOutLabelRow}>
+                <Text style={{ fontSize: 13 }}>↘️</Text>
+                <Text style={[styles.inOutStatLabel, { color: theme.textSecondary }]}>
+                  Saídas (Gastos)
+                </Text>
+              </View>
+              <Text style={[styles.inOutStatValue, { color: isDark ? '#F87171' : '#DC2626' }]}>
+                - {formatCurrency(totalExpense)}
+              </Text>
+            </View>
+          </View>
+
+          {/* RODAPÉ: GASTOS COMPARTILHADOS & PRIVADOS */}
           <View style={[styles.summarySplitRow, { borderTopColor: theme.border }]}>
             <View style={styles.summarySplitItem}>
               <View style={styles.splitBadgeRow}>
                 <Text style={{ fontSize: 13 }}>🏠</Text>
                 <Text style={[styles.summarySplitLabel, { color: theme.textSecondary }]}>
-                  Compartilhado
+                  Gastos Casal
                 </Text>
               </View>
               <Text style={[styles.summarySplitValue, { color: theme.primary }]}>
-                {formatCurrency(summary.totalShared)}
+                {formatCurrency(summary?.totalShared || 0)}
               </Text>
               <Text style={[styles.summarySplitSub, { color: theme.textMuted }]}>
-                Sua parte: {formatCurrency(summary.userShareOfShared)}
+                Sua parte: {formatCurrency(summary?.userShareOfShared || 0)}
               </Text>
             </View>
 
@@ -345,14 +444,14 @@ export default function ExpensesScreen() {
                 </Text>
               </View>
               <Text style={[styles.summarySplitValue, { color: theme.textPrimary }]}>
-                {formatCurrency(summary.totalPrivate)}
+                {formatCurrency(summary?.totalPrivate || 0)}
               </Text>
               <Text style={[styles.summarySplitSub, { color: theme.textMuted }]}>
                 Individual
               </Text>
             </View>
 
-            {!!summary.partnerPrivate && summary.partnerPrivate > 0 ? (
+            {!!summary?.partnerPrivate && summary.partnerPrivate > 0 ? (
               <>
                 <View style={[styles.verticalDivider, { backgroundColor: theme.border }]} />
                 <View style={styles.summarySplitItem}>
@@ -503,6 +602,53 @@ export default function ExpensesScreen() {
           )}
         </View>
 
+        {/* FILTRO DE TIPO (TODOS / GASTOS / GANHOS) */}
+        <View
+          style={[
+            styles.typeFilterContainer,
+            { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+          ]}
+        >
+          {(
+            [
+              { id: 'ALL', label: 'Todos' },
+              { id: 'EXPENSE', label: '🔴 Gastos' },
+              { id: 'INCOME', label: '🟢 Ganhos' },
+            ] as const
+          ).map(({ id, label }) => {
+            const isSelected = activeType === id;
+            return (
+              <TouchableOpacity
+                key={id}
+                style={[
+                  styles.typeFilterBtn,
+                  isSelected && {
+                    backgroundColor:
+                      id === 'INCOME' ? '#059669' : id === 'EXPENSE' ? '#DC2626' : theme.surface,
+                    borderColor:
+                      id === 'INCOME' ? '#059669' : id === 'EXPENSE' ? '#DC2626' : theme.border,
+                    elevation: isSelected ? 2 : 0,
+                  },
+                ]}
+                onPress={() => setActiveType(id)}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.typeFilterText,
+                    {
+                      color: isSelected ? '#FFFFFF' : theme.textSecondary,
+                      fontWeight: isSelected ? '700' : '600',
+                    },
+                  ]}
+                >
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
         {/* SELETOR DE ESCOPO (CHIPS) */}
         <View style={styles.scopeChipsContainer}>
           {[
@@ -533,11 +679,11 @@ export default function ExpensesScreen() {
               >
                 <Text
                   style={[
-                  styles.scopeChipText,
-                  {
-                    color: isSelected ? '#FFFFFF' : theme.textSecondary,
-                    fontWeight: isSelected ? '700' : '500',
-                  },
+                    styles.scopeChipText,
+                    {
+                      color: isSelected ? '#FFFFFF' : theme.textSecondary,
+                      fontWeight: isSelected ? '700' : '500',
+                    },
                   ]}
                 >
                   {label}
@@ -547,7 +693,7 @@ export default function ExpensesScreen() {
           })}
         </View>
 
-        {/* LISTAGEM DE GASTOS */}
+        {/* LISTAGEM DE GASTOS / GANHOS */}
         <View style={styles.listSection}>
           <Text style={[styles.listSectionTitle, { color: theme.textPrimary }]}>
             Lançamentos ({expenses.length})
@@ -555,20 +701,29 @@ export default function ExpensesScreen() {
 
           {expenses.length === 0 ? (
             <EmptyState
-              title={activeScope === 'PARTNER' ? 'Nenhum gasto do par' : 'Nenhum gasto encontrado'}
+              title={
+                activeScope === 'PARTNER'
+                  ? 'Nenhum lançamento do par'
+                  : activeType === 'INCOME'
+                  ? 'Nenhum ganho encontrado'
+                  : activeType === 'EXPENSE'
+                  ? 'Nenhum gasto encontrado'
+                  : 'Nenhum lançamento encontrado'
+              }
               description={
                 activeScope === 'PARTNER'
-                  ? 'Seu par ainda não possui gastos pessoais cadastrados neste período, ou a permissão para visualização de gastos pessoais ainda não foi ativada por ele em Configurações.'
+                  ? 'Seu par ainda não possui lançamentos pessoais cadastrados neste período, ou a permissão para visualização ainda não foi ativada por ele em Configurações.'
                   : filterMode === 'MONTH'
                   ? `Não há lançamentos em ${MONTH_NAMES[selectedMonth - 1]} de ${selectedYear}.`
                   : 'Não há lançamentos no período informado.'
               }
-              actionTitle={activeScope === 'PARTNER' ? undefined : '+ Registrar Gasto'}
+              actionTitle={activeScope === 'PARTNER' ? undefined : '+ Novo Lançamento'}
               onAction={activeScope === 'PARTNER' ? undefined : handleOpenCreate}
             />
           ) : (
             expenses.map((item) => {
               const isPartnerPrivate = item.scope === 'PRIVATE' && !!user?.id && item.userId !== user.id;
+              const isIncome = item.type === TransactionType.INCOME;
               return (
                 <TouchableOpacity
                   key={item.id}
@@ -584,9 +739,29 @@ export default function ExpensesScreen() {
                   onPress={() => !isPartnerPrivate && handleOpenEdit(item)}
                 >
                   <View style={styles.cardLeft}>
-                    <Text style={[styles.cardDesc, { color: theme.textPrimary }]}>
-                      {item.description}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                      <View
+                        style={[
+                          styles.typeBadge,
+                          {
+                            backgroundColor: isIncome ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.typeBadgeText,
+                            { color: isIncome ? '#059669' : '#DC2626' },
+                          ]}
+                        >
+                          {isIncome ? '🟢 Ganho' : '🔴 Gasto'}
+                        </Text>
+                      </View>
+                      <Text style={[styles.cardDesc, { color: theme.textPrimary, flex: 1 }]} numberOfLines={1}>
+                        {item.description}
+                      </Text>
+                    </View>
+
                     <Text style={[styles.cardCategory, { color: theme.textSecondary }]}>
                       {getCategoryLabel(item.category)}
                     </Text>
@@ -603,8 +778,13 @@ export default function ExpensesScreen() {
                   </View>
 
                   <View style={styles.cardRight}>
-                    <Text style={[styles.cardAmount, { color: theme.textPrimary }]}>
-                      {formatCurrency(item.amount)}
+                    <Text
+                      style={[
+                        styles.cardAmount,
+                        { color: isIncome ? (isDark ? '#34D399' : '#059669') : theme.textPrimary },
+                      ]}
+                    >
+                      {isIncome ? `+ ${formatCurrency(item.amount)}` : `- ${formatCurrency(item.amount)}`}
                     </Text>
 
                     {isPartnerPrivate ? (
@@ -659,7 +839,7 @@ export default function ExpensesScreen() {
         activeOpacity={0.85}
       >
         <Text style={styles.fabIcon}>＋</Text>
-        <Text style={styles.fabText}>Novo Gasto</Text>
+        <Text style={styles.fabText}>Novo Lançamento</Text>
       </TouchableOpacity>
 
       {/* MODAL DE CALENDÁRIO RANGE */}
@@ -690,7 +870,7 @@ export default function ExpensesScreen() {
 
             <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
               <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
-                Novo Lançamento
+                {transactionType === TransactionType.INCOME ? 'Novo Ganho (Entrada)' : 'Novo Gasto (Saída)'}
               </Text>
               <TouchableOpacity onPress={() => setCreateModalVisible(false)} style={{ padding: 4 }}>
                 <Text style={[styles.closeText, { color: theme.primary }]}>Fechar</Text>
@@ -698,9 +878,87 @@ export default function ExpensesScreen() {
             </View>
 
             <ScrollView style={{ padding: 20 }}>
+              {/* TIPO: GASTO OU GANHO */}
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
+                Tipo de Transação
+              </Text>
+              <View style={styles.transactionTypeRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.transactionTypeBtn,
+                    {
+                      backgroundColor:
+                        transactionType === TransactionType.EXPENSE
+                          ? (isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2')
+                          : theme.inputBg,
+                      borderColor:
+                        transactionType === TransactionType.EXPENSE ? '#DC2626' : theme.inputBorder,
+                    },
+                  ]}
+                  onPress={() => {
+                    setTransactionType(TransactionType.EXPENSE);
+                    if (INCOME_CATEGORIES.includes(category)) {
+                      setCategory(EXPENSE_CATEGORIES[0]);
+                    }
+                  }}
+                >
+                  <Text style={{ fontSize: 16 }}>🔴</Text>
+                  <Text
+                    style={[
+                      styles.transactionTypeText,
+                      {
+                        color:
+                          transactionType === TransactionType.EXPENSE ? '#DC2626' : theme.textPrimary,
+                        fontWeight: transactionType === TransactionType.EXPENSE ? '700' : '600',
+                      },
+                    ]}
+                  >
+                    Gasto (Saída)
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.transactionTypeBtn,
+                    {
+                      backgroundColor:
+                        transactionType === TransactionType.INCOME
+                          ? (isDark ? 'rgba(16, 185, 129, 0.2)' : '#D1FAE5')
+                          : theme.inputBg,
+                      borderColor:
+                        transactionType === TransactionType.INCOME ? '#059669' : theme.inputBorder,
+                    },
+                  ]}
+                  onPress={() => {
+                    setTransactionType(TransactionType.INCOME);
+                    if (EXPENSE_CATEGORIES.includes(category)) {
+                      setCategory(INCOME_CATEGORIES[0]);
+                    }
+                  }}
+                >
+                  <Text style={{ fontSize: 16 }}>🟢</Text>
+                  <Text
+                    style={[
+                      styles.transactionTypeText,
+                      {
+                        color:
+                          transactionType === TransactionType.INCOME ? '#059669' : theme.textPrimary,
+                        fontWeight: transactionType === TransactionType.INCOME ? '700' : '600',
+                      },
+                    ]}
+                  >
+                    Ganho (Entrada)
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               <Input
                 label="Descrição"
-                placeholder="Ex: Supermercado Pão de Açúcar"
+                placeholder={
+                  transactionType === TransactionType.INCOME
+                    ? 'Ex: Salário do mês, Venda de notebook...'
+                    : 'Ex: Supermercado Pão de Açúcar...'
+                }
                 value={description}
                 onChangeText={setDescription}
               />
@@ -722,7 +980,7 @@ export default function ExpensesScreen() {
               />
 
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
-                Escopo do Gasto
+                Escopo {transactionType === TransactionType.INCOME ? 'do Ganho' : 'do Gasto'}
               </Text>
               <View style={styles.scopeSelector}>
                 <TouchableOpacity
@@ -772,7 +1030,7 @@ export default function ExpensesScreen() {
                 Categoria
               </Text>
               <View style={styles.categoryGrid}>
-                {Object.values(ExpenseCategory).map((cat) => {
+                {(transactionType === TransactionType.INCOME ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((cat) => {
                   const isCatSelected = category === cat;
                   return (
                     <TouchableOpacity
@@ -803,7 +1061,7 @@ export default function ExpensesScreen() {
               </View>
 
               <Button
-                title="Salvar Gasto"
+                title={transactionType === TransactionType.INCOME ? 'Salvar Ganho' : 'Salvar Gasto'}
                 onPress={handleCreate}
                 isLoading={isCreating}
                 style={{ marginTop: 24, marginBottom: 40 }}
@@ -823,7 +1081,7 @@ export default function ExpensesScreen() {
 
             <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
               <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
-                Editar Gasto
+                {transactionType === TransactionType.INCOME ? 'Editar Ganho' : 'Editar Gasto'}
               </Text>
               <TouchableOpacity onPress={() => setEditModalVisible(false)} style={{ padding: 4 }}>
                 <Text style={[styles.closeText, { color: theme.primary }]}>Fechar</Text>
@@ -831,9 +1089,87 @@ export default function ExpensesScreen() {
             </View>
 
             <ScrollView style={{ padding: 20 }}>
+              {/* TIPO: GASTO OU GANHO */}
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
+                Tipo de Transação
+              </Text>
+              <View style={styles.transactionTypeRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.transactionTypeBtn,
+                    {
+                      backgroundColor:
+                        transactionType === TransactionType.EXPENSE
+                          ? (isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2')
+                          : theme.inputBg,
+                      borderColor:
+                        transactionType === TransactionType.EXPENSE ? '#DC2626' : theme.inputBorder,
+                    },
+                  ]}
+                  onPress={() => {
+                    setTransactionType(TransactionType.EXPENSE);
+                    if (INCOME_CATEGORIES.includes(category)) {
+                      setCategory(EXPENSE_CATEGORIES[0]);
+                    }
+                  }}
+                >
+                  <Text style={{ fontSize: 16 }}>🔴</Text>
+                  <Text
+                    style={[
+                      styles.transactionTypeText,
+                      {
+                        color:
+                          transactionType === TransactionType.EXPENSE ? '#DC2626' : theme.textPrimary,
+                        fontWeight: transactionType === TransactionType.EXPENSE ? '700' : '600',
+                      },
+                    ]}
+                  >
+                    Gasto (Saída)
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.transactionTypeBtn,
+                    {
+                      backgroundColor:
+                        transactionType === TransactionType.INCOME
+                          ? (isDark ? 'rgba(16, 185, 129, 0.2)' : '#D1FAE5')
+                          : theme.inputBg,
+                      borderColor:
+                        transactionType === TransactionType.INCOME ? '#059669' : theme.inputBorder,
+                    },
+                  ]}
+                  onPress={() => {
+                    setTransactionType(TransactionType.INCOME);
+                    if (EXPENSE_CATEGORIES.includes(category)) {
+                      setCategory(INCOME_CATEGORIES[0]);
+                    }
+                  }}
+                >
+                  <Text style={{ fontSize: 16 }}>🟢</Text>
+                  <Text
+                    style={[
+                      styles.transactionTypeText,
+                      {
+                        color:
+                          transactionType === TransactionType.INCOME ? '#059669' : theme.textPrimary,
+                        fontWeight: transactionType === TransactionType.INCOME ? '700' : '600',
+                      },
+                    ]}
+                  >
+                    Ganho (Entrada)
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               <Input
                 label="Descrição"
-                placeholder="Ex: Supermercado"
+                placeholder={
+                  transactionType === TransactionType.INCOME
+                    ? 'Ex: Salário do mês, Venda...'
+                    : 'Ex: Supermercado...'
+                }
                 value={description}
                 onChangeText={setDescription}
               />
@@ -855,7 +1191,7 @@ export default function ExpensesScreen() {
               />
 
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
-                Escopo do Gasto
+                Escopo {transactionType === TransactionType.INCOME ? 'do Ganho' : 'do Gasto'}
               </Text>
               <View style={styles.scopeSelector}>
                 <TouchableOpacity
@@ -905,7 +1241,7 @@ export default function ExpensesScreen() {
                 Categoria
               </Text>
               <View style={styles.categoryGrid}>
-                {Object.values(ExpenseCategory).map((cat) => {
+                {(transactionType === TransactionType.INCOME ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((cat) => {
                   const isCatSelected = category === cat;
                   return (
                     <TouchableOpacity
@@ -943,7 +1279,7 @@ export default function ExpensesScreen() {
                 />
                 {editingExpense && (
                   <Button
-                    title="Excluir Gasto"
+                    title={transactionType === TransactionType.INCOME ? 'Excluir Ganho' : 'Excluir Gasto'}
                     variant="ghost"
                     onPress={() => handleDelete(editingExpense.id, editingExpense.description)}
                     style={{ borderColor: theme.danger, borderWidth: 1 }}
@@ -1296,5 +1632,85 @@ const styles = StyleSheet.create({
   },
   catText: {
     fontSize: 12,
+  },
+  typeFilterContainer: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 12,
+    borderWidth: 1,
+    gap: 4,
+  },
+  typeFilterBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  typeFilterText: {
+    fontSize: 13,
+  },
+  typeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  typeBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  transactionTypeRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  transactionTypeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    gap: 6,
+  },
+  transactionTypeText: {
+    fontSize: 14,
+  },
+  balancePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  balancePillText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  inOutStatsRow: {
+    flexDirection: 'row',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 12,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  inOutStatItem: {
+    flex: 1,
+  },
+  inOutLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 4,
+  },
+  inOutStatLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  inOutStatValue: {
+    fontSize: 15,
+    fontWeight: '800',
   },
 });

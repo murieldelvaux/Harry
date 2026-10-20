@@ -13,6 +13,7 @@ export function useExpenses(filters: {
   startDate?: string;
   endDate?: string;
   scope?: string;
+  type?: string;
   category?: string;
 } = {}) {
   const queryClient = useQueryClient();
@@ -60,9 +61,13 @@ export function useExpenses(filters: {
   return {
     expenses: expensesQuery.data?.items || [],
     summary: expensesQuery.data?.summary || {
+      totalIncome: 0,
+      totalExpense: 0,
+      balance: 0,
       totalPrivate: 0,
       totalShared: 0,
       userShareOfShared: 0,
+      partnerPrivate: 0,
       month: currentMonth,
     },
     isLoading: expensesQuery.isLoading,

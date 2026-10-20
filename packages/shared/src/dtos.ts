@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RecordScope, ExpenseCategory, GoalStatus, AIIntent } from './enums';
+import { RecordScope, TransactionType, ExpenseCategory, GoalStatus, AIIntent } from './enums';
 
 // -----------------------------------------------------------------------------
 // Auth DTOs
@@ -103,6 +103,7 @@ export interface HouseholdDetailDto {
 export const CreateExpenseDtoSchema = z.object({
   description: z.string().min(1, 'Descrição obrigatória'),
   amount: z.number().positive('O valor deve ser maior que zero'),
+  type: z.nativeEnum(TransactionType).default(TransactionType.EXPENSE),
   category: z.nativeEnum(ExpenseCategory).default(ExpenseCategory.OTHER),
   scope: z.nativeEnum(RecordScope).default(RecordScope.PRIVATE),
   date: z.string().optional(), // ISO date string
@@ -117,6 +118,7 @@ export interface ExpenseDto {
   id: string;
   description: string;
   amount: number;
+  type: TransactionType;
   category: ExpenseCategory;
   date: string;
   scope: RecordScope;
@@ -132,6 +134,9 @@ export interface ExpenseDto {
 }
 
 export interface ExpensesSummaryDto {
+  totalIncome: number;
+  totalExpense: number;
+  balance: number;
   totalPrivate: number;
   totalShared: number;
   userShareOfShared: number;
@@ -304,6 +309,7 @@ export interface ParsedWhatsAppResultDto {
   data: {
     title: string;
     amount?: number;
+    transactionType?: TransactionType;
     category?: ExpenseCategory;
     scope: RecordScope;
     dueDate?: string;

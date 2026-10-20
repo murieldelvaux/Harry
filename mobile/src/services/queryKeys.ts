@@ -4,7 +4,7 @@ export const queryKeys = {
   },
   expenses: {
     all: ['expenses'] as const,
-    list: (filters: { month?: string; scope?: string; category?: string }) =>
+    list: (filters: { month?: string; scope?: string; type?: string; category?: string; startDate?: string; endDate?: string }) =>
       ['expenses', 'list', filters] as const,
     detail: (id: string) => ['expenses', 'detail', id] as const,
   },

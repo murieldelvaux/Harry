@@ -4,7 +4,7 @@ import axios from 'axios';
 import { PrismaService } from '../../database/prisma.service';
 import { AiParserService } from '../ai-parser/ai-parser.service';
 import { RealtimeService } from '../../common/realtime/realtime.service';
-import { AIIntent, RecordScope, ExpenseCategory, ParsedWhatsAppResultDto } from '../../../../packages/shared/src';
+import { AIIntent, RecordScope, TransactionType, ExpenseCategory, ParsedWhatsAppResultDto } from '../../../../packages/shared/src';
 
 @Injectable()
 export class WhatsappService {
@@ -183,10 +183,14 @@ export class WhatsappService {
       
 
       if (parsed.intent === AIIntent.CREATE_EXPENSE && parsed.data.amount) {
+        const transactionType = parsed.data.transactionType || TransactionType.EXPENSE;
+        const isIncome = transactionType === TransactionType.INCOME;
+
         const expense = await this.prisma.expense.create({
           data: {
             description: parsed.data.title,
             amount: parsed.data.amount,
+            type: transactionType,
             category: parsed.data.category || ExpenseCategory.OTHER,
             scope: isShared ? RecordScope.SHARED : RecordScope.PRIVATE,
             rawSource: mediaSourceLabel ? `whatsapp_${messageType}` : 'whatsapp_message',
@@ -205,9 +209,15 @@ export class WhatsappService {
         const formattedAmount = Number(expense.amount).toFixed(2).replace('.', ',');
         const sourceNotice = mediaSourceLabel ? ` (${mediaSourceLabel})` : '';
 
-        await this.sendWhatsAppMessage(replyToPhone,
-          `✅ *Gasto Registrado!*${sourceNotice}\n\n📝 *Nome:* ${expense.description}\n💰 *Valor:* R$ ${formattedAmount}\n🏷️ *Escopo:* ${scopeLabel}\n\nJá sincronizado no seu app Harry! 📲`,
-        );
+        if (isIncome) {
+          await this.sendWhatsAppMessage(replyToPhone,
+            `💰 *Ganho Registrado!* (Entrada) 🟢${sourceNotice}\n\n📝 *Origem:* ${expense.description}\n💵 *Valor:* + R$ ${formattedAmount}\n🏷️ *Escopo:* ${scopeLabel}\n\nJá sincronizado no seu app Harry! 📲`,
+          );
+        } else {
+          await this.sendWhatsAppMessage(replyToPhone,
+            `✅ *Gasto Registrado!* (Saída) 🔴${sourceNotice}\n\n📝 *Nome:* ${expense.description}\n💰 *Valor:* - R$ ${formattedAmount}\n🏷️ *Escopo:* ${scopeLabel}\n\nJá sincronizado no seu app Harry! 📲`,
+          );
+        }
       } else if (parsed.intent === AIIntent.CREATE_GOAL && parsed.data.amount) {
         const goal = await this.prisma.goal.create({
           data: {

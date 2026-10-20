@@ -10,6 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { TransactionType } from '@nexo/shared';
 import { useExpenses } from '../../src/hooks/useExpenses';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useHousehold } from '../../src/hooks/useHousehold';
@@ -35,6 +36,11 @@ export default function DashboardScreen() {
     (summary?.totalShared || 0) +
     (summary?.totalPrivate || 0) +
     (summary?.partnerPrivate || 0);
+
+  const totalIncome = summary?.totalIncome ?? 0;
+  const totalExpense = summary?.totalExpense ?? totalGeral;
+  const balance = summary?.balance ?? (totalIncome - totalExpense);
+  const isPositiveBalance = balance >= 0;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -71,19 +77,69 @@ export default function DashboardScreen() {
           ]}
         >
           <View style={styles.heroTop}>
-            <Text style={[styles.heroLabel, { color: theme.textSecondary }]}>
-              Total de Gastos no Mês
-            </Text>
-            <View style={[styles.statusPill, { backgroundColor: theme.primaryLight }]}>
-              <Text style={[styles.statusPillText, { color: theme.primary }]}>
-                {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+            <View>
+              <Text style={[styles.heroLabel, { color: theme.textSecondary }]}>
+                Balanço do Mês
+              </Text>
+              <Text style={{ fontSize: 11, color: theme.textMuted, marginTop: 1 }}>
+                Entradas menos Saídas
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.statusPill,
+                {
+                  backgroundColor: isPositiveBalance
+                    ? 'rgba(16, 185, 129, 0.12)'
+                    : 'rgba(239, 68, 68, 0.12)',
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.statusPillText,
+                  { color: isPositiveBalance ? '#059669' : '#DC2626', fontWeight: '700' },
+                ]}
+              >
+                {isPositiveBalance ? '🟢 Saldo Positivo' : '🔴 Em Déficit'}
               </Text>
             </View>
           </View>
 
-          <Text style={[styles.heroValue, { color: theme.textPrimary }]}>
-            {formatCurrency(totalGeral)}
+          <Text
+            style={[
+              styles.heroValue,
+              { color: isPositiveBalance ? (isDark ? '#34D399' : '#059669') : '#DC2626' },
+            ]}
+          >
+            {isPositiveBalance ? `+ ${formatCurrency(balance)}` : `- ${formatCurrency(Math.abs(balance))}`}
           </Text>
+
+          {/* TOTAL ENTRADAS E SAÍDAS */}
+          <View
+            style={[
+              styles.inOutHeroRow,
+              { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+            ]}
+          >
+            <View style={styles.inOutHeroItem}>
+              <Text style={[styles.inOutHeroLabel, { color: theme.textSecondary }]}>
+                ↗️ Ganhos (Entradas)
+              </Text>
+              <Text style={[styles.inOutHeroValue, { color: '#059669' }]}>
+                + {formatCurrency(totalIncome)}
+              </Text>
+            </View>
+            <View style={[styles.inOutHeroDivider, { backgroundColor: theme.border }]} />
+            <View style={styles.inOutHeroItem}>
+              <Text style={[styles.inOutHeroLabel, { color: theme.textSecondary }]}>
+                ↘️ Gastos (Saídas)
+              </Text>
+              <Text style={[styles.inOutHeroValue, { color: '#DC2626' }]}>
+                - {formatCurrency(totalExpense)}
+              </Text>
+            </View>
+          </View>
 
           {/* DIVISÃO COMPARTILHADA VS PRIVADA */}
           <View style={[styles.splitMetricsRow, { borderTopColor: theme.border }]}>
@@ -147,7 +203,7 @@ export default function DashboardScreen() {
               activeOpacity={0.75}
             >
               <Text style={styles.actionPillEmoji}>💸</Text>
-              <Text style={[styles.actionPillText, { color: theme.textPrimary }]}>+ Gasto</Text>
+              <Text style={[styles.actionPillText, { color: theme.textPrimary }]}>+ Finanças</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -213,79 +269,108 @@ export default function DashboardScreen() {
 
           {/* Lista de Gastos Recentes */}
           {expenses && expenses.length > 0 ? (
-            expenses.slice(0, 5).map((item) => (
-              <View
-                key={item.id}
-                style={[
-                  styles.expenseRowItem,
-                  { backgroundColor: theme.surface, borderColor: theme.border },
-                  theme.cardShadow,
-                ]}
-              >
-                <View style={[styles.categoryIconBadge, { backgroundColor: theme.surfaceSubtle }]}>
-                  <Text style={{ fontSize: 18 }}>🧾</Text>
-                </View>
-
-                <View style={styles.expenseInfoCol}>
-                  <Text style={[styles.expenseTitle, { color: theme.textPrimary }]} numberOfLines={1}>
-                    {item.description}
-                  </Text>
-                  <View style={styles.expenseSubRow}>
-                    <Text style={[styles.expenseCategoryText, { color: theme.textSecondary }]}>
-                      {getCategoryLabel(item.category)}
-                    </Text>
-                    <Text style={[styles.expenseDot, { color: theme.textMuted }]}>•</Text>
-                    <Text style={[styles.expenseDateText, { color: theme.textMuted }]}>
-                      {formatDate(item.date)}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.expenseAmountCol}>
-                  <Text style={[styles.expenseAmountText, { color: theme.textPrimary }]}>
-                    {formatCurrency(item.amount)}
-                  </Text>
+            expenses.slice(0, 5).map((item) => {
+              const isIncome = item.type === TransactionType.INCOME;
+              return (
+                <View
+                  key={item.id}
+                  style={[
+                    styles.expenseRowItem,
+                    { backgroundColor: theme.surface, borderColor: theme.border },
+                    theme.cardShadow,
+                  ]}
+                >
                   <View
                     style={[
-                      styles.miniScopeTag,
+                      styles.categoryIconBadge,
                       {
-                        backgroundColor:
-                          item.scope === 'SHARED'
-                            ? theme.tagSharedBg
-                            : item.scope === 'PRIVATE' && !!user?.id && item.userId !== user.id
-                            ? 'rgba(139, 92, 246, 0.15)'
-                            : theme.tagPrivateBg,
+                        backgroundColor: isIncome
+                          ? 'rgba(16, 185, 129, 0.12)'
+                          : theme.surfaceSubtle,
                       },
                     ]}
                   >
+                    <Text style={{ fontSize: 18 }}>{isIncome ? '💰' : '🧾'}</Text>
+                  </View>
+
+                  <View style={styles.expenseInfoCol}>
+                    <Text style={[styles.expenseTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                      {item.description}
+                    </Text>
+                    <View style={styles.expenseSubRow}>
+                      <Text
+                        style={[
+                          styles.expenseCategoryText,
+                          {
+                            color: isIncome ? '#059669' : theme.textSecondary,
+                            fontWeight: isIncome ? '700' : '400',
+                          },
+                        ]}
+                      >
+                        {isIncome ? `🟢 ${getCategoryLabel(item.category)}` : getCategoryLabel(item.category)}
+                      </Text>
+                      <Text style={[styles.expenseDot, { color: theme.textMuted }]}>•</Text>
+                      <Text style={[styles.expenseDateText, { color: theme.textMuted }]}>
+                        {formatDate(item.date)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.expenseAmountCol}>
                     <Text
                       style={[
-                        styles.miniScopeTagText,
+                        styles.expenseAmountText,
                         {
-                          color:
-                            item.scope === 'SHARED'
-                              ? theme.tagSharedText
-                              : item.scope === 'PRIVATE' && !!user?.id && item.userId !== user.id
-                              ? '#8B5CF6'
-                              : theme.tagPrivateText,
+                          color: isIncome
+                            ? (isDark ? '#34D399' : '#059669')
+                            : theme.textPrimary,
                         },
                       ]}
                     >
-                      {item.scope === 'SHARED'
-                        ? 'Casa'
-                        : item.scope === 'PRIVATE' && !!user?.id && item.userId !== user.id
-                        ? `👁️ ${item.author?.name || 'Par'}`
-                        : 'Pessoal'}
+                      {isIncome ? `+ ${formatCurrency(item.amount)}` : `- ${formatCurrency(item.amount)}`}
                     </Text>
+                    <View
+                      style={[
+                        styles.miniScopeTag,
+                        {
+                          backgroundColor:
+                            item.scope === 'SHARED'
+                              ? theme.tagSharedBg
+                              : item.scope === 'PRIVATE' && !!user?.id && item.userId !== user.id
+                              ? 'rgba(139, 92, 246, 0.15)'
+                              : theme.tagPrivateBg,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.miniScopeTagText,
+                          {
+                            color:
+                              item.scope === 'SHARED'
+                                ? theme.tagSharedText
+                                : item.scope === 'PRIVATE' && !!user?.id && item.userId !== user.id
+                                ? '#8B5CF6'
+                                : theme.tagPrivateText,
+                          },
+                        ]}
+                      >
+                        {item.scope === 'SHARED'
+                          ? 'Casa'
+                          : item.scope === 'PRIVATE' && !!user?.id && item.userId !== user.id
+                          ? `👁️ ${item.author?.name || 'Par'}`
+                          : 'Pessoal'}
+                      </Text>
+                    </View>
                   </View>
                 </View>
-              </View>
-            ))
+              );
+            })
           ) : (
             <View style={[styles.emptyBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               <Text style={styles.emptyEmoji}>🍃</Text>
               <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                Nenhum gasto registrado neste mês ainda.
+                Nenhum lançamento registrado neste mês ainda.
               </Text>
             </View>
           )}
@@ -505,5 +590,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
     textAlign: 'center',
+  },
+  inOutHeroRow: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  inOutHeroItem: {
+    flex: 1,
+  },
+  inOutHeroLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  inOutHeroValue: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  inOutHeroDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 32,
+    marginHorizontal: 10,
   },
 });

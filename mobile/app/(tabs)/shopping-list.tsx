@@ -75,7 +75,7 @@ export default function ShoppingListScreen() {
   const [importStatusMsg, setImportStatusMsg] = useState<string | null>(null);
 
 
-    const handlePickImage = async () => {
+  const handlePickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
@@ -348,30 +348,30 @@ export default function ShoppingListScreen() {
             </TouchableOpacity>
 
             {/* Seletor rápido de escopo para novos itens */}
-          <TouchableOpacity
-            onPress={() => setQuickScope(quickScope === RecordScope.SHARED ? RecordScope.PRIVATE : RecordScope.SHARED)}
-            style={[
-              styles.quickScopePill,
-              {
-                backgroundColor: quickScope === RecordScope.SHARED ? theme.tagSharedBg : theme.tagPrivateBg,
-                borderColor: theme.border,
-              },
-            ]}
-            activeOpacity={0.8}
-          >
-            <Text
+            <TouchableOpacity
+              onPress={() => setQuickScope(quickScope === RecordScope.SHARED ? RecordScope.PRIVATE : RecordScope.SHARED)}
               style={[
-                styles.quickScopeText,
+                styles.quickScopePill,
                 {
-                  color: quickScope === RecordScope.SHARED
-                    ? (isDark ? '#7DD3FC' : '#1D4ED8')
-                    : theme.textPrimary,
+                  backgroundColor: quickScope === RecordScope.SHARED ? theme.tagSharedBg : theme.tagPrivateBg,
+                  borderColor: theme.border,
                 },
               ]}
+              activeOpacity={0.8}
             >
-              {quickScope === RecordScope.SHARED ? '🏠 Compartilhada' : '🔒 Pessoal'}
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={[
+                  styles.quickScopeText,
+                  {
+                    color: quickScope === RecordScope.SHARED
+                      ? (isDark ? '#7DD3FC' : '#1D4ED8')
+                      : theme.textPrimary,
+                  },
+                ]}
+              >
+                {quickScope === RecordScope.SHARED ? '🏠 Compartilhada' : '🔒 Pessoal'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -501,7 +501,6 @@ export default function ShoppingListScreen() {
                 activeOpacity={0.7}
                 onPress={() => toggleItem(item.id)}
               >
-                {/* Checkbox Circular Estilo Alexa */}
                 <TouchableOpacity
                   style={[styles.checkboxCircle, { borderColor: theme.primary }]}
                   onPress={() => toggleItem(item.id)}
@@ -551,7 +550,6 @@ export default function ShoppingListScreen() {
           </View>
         )}
 
-        {/* SEÇÃO 2: ITENS COMPRADOS (ESTILO ALEXA) */}
         {completedItems.length > 0 && (
           <View style={styles.completedSection}>
             <View style={styles.completedHeaderRow}>

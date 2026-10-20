@@ -31,9 +31,10 @@ export class ExpensesController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('scope') scope?: string,
+    @Query('type') type?: string,
     @Query('category') category?: string,
   ) {
-    return this.expensesService.findAll(userId, { month, startDate, endDate, scope, category });
+    return this.expensesService.findAll(userId, { month, startDate, endDate, scope, type, category });
   }
 
   @Get(':id')

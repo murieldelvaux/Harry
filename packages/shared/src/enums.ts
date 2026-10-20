@@ -3,6 +3,11 @@ export enum RecordScope {
   SHARED = 'SHARED',
 }
 
+export enum TransactionType {
+  EXPENSE = 'EXPENSE',
+  INCOME = 'INCOME',
+}
+
 export enum ExpenseCategory {
   HOUSING = 'HOUSING',
   FOOD_MARKET = 'FOOD_MARKET',
@@ -12,6 +17,10 @@ export enum ExpenseCategory {
   LEISURE = 'LEISURE',
   UTILITIES = 'UTILITIES',
   SUBSCRIPTIONS = 'SUBSCRIPTIONS',
+  SALARY = 'SALARY',
+  INVESTMENT = 'INVESTMENT',
+  FREELANCE = 'FREELANCE',
+  SALE = 'SALE',
   OTHER = 'OTHER',
 }
 
