@@ -86,7 +86,7 @@ export class WhatsappService {
         if (!wakeCheck.hasWakeWord) {
           await this.sendWhatsAppMessage(
             replyToPhone,
-            `👋 Olá, ${firstName}! Para que eu possa te ajudar, comece sua mensagem me chamando de *Harry* (como na Alexa! 🎙️).\n\n*Exemplos:*\n• _"Harry, gastei 50 no mercado"_\n• _"Harry, o que tenho na agenda hoje?"_\n• _"Harry, agendar dentista amanhã às 14h"_\n• _"Harry, lembrar de pagar o condomínio amanhã"_\n• _"Harry, adicionar leite na lista de compras"_`,
+            `👋 Olá, ${firstName}! Para que eu possa te ajudar, comece sua mensagem me chamando de *Harry*.\n\n*Exemplos:*\n• _"Harry, gastei 50 no mercado"_\n• _"Harry, o que tenho na agenda hoje?"_\n• _"Harry, agendar dentista amanhã às 14h"_\n• _"Harry, lembrar de pagar o condomínio amanhã"_\n• _"Harry, adicionar leite na lista de compras"_`,
             user.phoneNumber || undefined,
           );
           return;
@@ -684,7 +684,7 @@ export class WhatsappService {
         );
       } else {
         await this.sendWhatsAppMessage(replyToPhone,
-          `🤔 Não consegui identificar os dados com clareza.\n\nLembre-se de sempre começar me chamando de *Harry* (como na Alexa! 🎙️):\n• "Harry, gastei 50 no mercado hoje"\n• "Harry, o que tenho na agenda amanhã?"\n• "Harry, agendar dentista amanhã 14h"\n• "Harry, guardar 500 na meta viagem"\n• Ou envie a foto de um comprovante Pix ou cupom fiscal 📸`,
+          `🤔 Não consegui identificar os dados com clareza.\n\nLembre-se de sempre começar me chamando de *Harry*:\n• "Harry, gastei 50 no mercado hoje"\n• "Harry, o que tenho na agenda amanhã?"\n• "Harry, agendar dentista amanhã 14h"\n• "Harry, guardar 500 na meta viagem"\n• Ou envie a foto de um comprovante Pix ou cupom fiscal 📸`,
         );
       }
     } catch (error) {
@@ -790,7 +790,7 @@ export class WhatsappService {
   async sendWelcomeMessage(toPhone: string, name?: string) {
     if (!toPhone) return;
     const firstName = name ? name.trim().split(' ')[0] : 'aí';
-    const welcomeText = `Olá, ${firstName}! 👋 Seja bem-vindo(a) ao *Harry*! ✨\n\nA partir de agora você pode gerenciar sua vida financeira, agenda, tarefas e compras diretamente por aqui pelo WhatsApp.\n\n🎙️ *Como falar comigo (Estilo Alexa):*\nSempre comece sua mensagem me chamando de *Harry*!\n\nExperimente enviar:\n• "Harry, gastei 45 no mercado"\n• "Harry, o que tenho na agenda hoje?"\n• "Harry, agendar dentista amanhã às 14h"\n• "Harry, lembrar de pagar o condomínio amanhã"\n• "Harry, adicionar café na lista de compras"\n• Ou envie a foto de um comprovante Pix ou cupom fiscal 📸`;
+    const welcomeText = `Olá, ${firstName}! 👋 Seja bem-vindo(a) ao *Harry*! ✨\n\nA partir de agora você pode gerenciar sua vida financeira, agenda, tarefas e compras diretamente por aqui pelo WhatsApp.\n\n🎙️ *Como falar comigo:*\nSempre comece sua mensagem me chamando de *Harry*!\n\nExperimente enviar:\n• "Harry, gastei 45 no mercado"\n• "Harry, o que tenho na agenda hoje?"\n• "Harry, agendar dentista amanhã às 14h"\n• "Harry, lembrar de pagar o condomínio amanhã"\n• "Harry, adicionar café na lista de compras"\n• Ou envie a foto de um comprovante Pix ou cupom fiscal 📸`;
     await this.sendWhatsAppMessage(toPhone, welcomeText);
   }
 

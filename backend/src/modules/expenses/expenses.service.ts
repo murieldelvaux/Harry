@@ -116,7 +116,27 @@ export class ExpensesService {
       }
     } else if (filters?.scope === 'SHARED') {
       if (!householdId) {
-        return { summary: { totalPrivate: 0, totalShared: 0, userShareOfShared: 0, partnerPrivate: 0, month: filters?.month || '' }, items: [] };
+        return {
+          summary: {
+            myIncome: 0,
+            myPrivateExpenses: 0,
+            myShareOfSharedExpenses: 0,
+            myTotalExpenses: 0,
+            myBalance: 0,
+            jointIncome: 0,
+            jointExpenses: 0,
+            jointBalance: 0,
+            totalIncome: 0,
+            totalExpense: 0,
+            balance: 0,
+            totalPrivate: 0,
+            totalShared: 0,
+            userShareOfShared: 0,
+            partnerPrivate: 0,
+            month: filters?.month || '',
+          },
+          items: [],
+        };
       }
       scopeWhere = { householdId, scope: RecordScope.SHARED };
     } else {
@@ -150,10 +170,12 @@ export class ExpensesService {
       },
     });
 
-    // Calcular Totais e Balanço
-    let totalIncome = 0;
-    let totalExpense = 0;
-    let totalPrivate = 0;
+    // Calcular Totais, Balanço Individual e Balanço em Conjunto
+    let myIncome = 0;
+    let partnerIncome = 0;
+    let sharedIncome = 0;
+
+    let myPrivateExpenses = 0;
     let partnerPrivate = 0;
     let totalShared = 0;
 
@@ -162,12 +184,20 @@ export class ExpensesService {
       const isIncome = exp.type === TransactionType.INCOME;
 
       if (isIncome) {
-        totalIncome += val;
-      } else {
-        totalExpense += val;
         if (exp.scope === RecordScope.PRIVATE) {
           if (exp.userId === userId) {
-            totalPrivate += val;
+            myIncome += val;
+          } else {
+            partnerIncome += val;
+          }
+        } else if (exp.scope === RecordScope.SHARED) {
+          sharedIncome += val;
+          myIncome += val / 2;
+        }
+      } else {
+        if (exp.scope === RecordScope.PRIVATE) {
+          if (exp.userId === userId) {
+            myPrivateExpenses += val;
           } else {
             partnerPrivate += val;
           }
@@ -178,7 +208,23 @@ export class ExpensesService {
     }
 
     const userShareOfShared = totalShared / 2;
-    const balance = totalIncome - totalExpense;
+
+    // 1. BALANÇO INDIVIDUAL (Apenas o que pertence ao usuário)
+    // O usuário responde pelos seus gastos pessoais + sua cota dos gastos compartilhados
+    // Os gastos privados do parceiro NUNCA são cobrados ou descontados daqui!
+    const myTotalExpenses = myPrivateExpenses + userShareOfShared;
+    const myBalance = myIncome - myTotalExpenses;
+
+    // 2. BALANÇO EM CONJUNTO (Visão Casal / Casa)
+    // Rendas da casa vs Gastos compartilhados da casa
+    const jointIncome = sharedIncome > 0 ? sharedIncome : (myIncome + partnerIncome);
+    const jointExpenses = totalShared;
+    const jointBalance = jointIncome - jointExpenses;
+
+    // 3. TOTAIS GERAIS
+    const totalIncome = myIncome + partnerIncome + (sharedIncome > 0 ? sharedIncome / 2 : 0);
+    const totalExpense = myPrivateExpenses + partnerPrivate + totalShared;
+    const balance = myBalance;
 
     // Filtrar itens por tipo se especificado
     let filteredItems = expenses;
@@ -188,10 +234,18 @@ export class ExpensesService {
 
     return {
       summary: {
+        myIncome: Number(myIncome.toFixed(2)),
+        myPrivateExpenses: Number(myPrivateExpenses.toFixed(2)),
+        myShareOfSharedExpenses: Number(userShareOfShared.toFixed(2)),
+        myTotalExpenses: Number(myTotalExpenses.toFixed(2)),
+        myBalance: Number(myBalance.toFixed(2)),
+        jointIncome: Number(jointIncome.toFixed(2)),
+        jointExpenses: Number(jointExpenses.toFixed(2)),
+        jointBalance: Number(jointBalance.toFixed(2)),
         totalIncome: Number(totalIncome.toFixed(2)),
         totalExpense: Number(totalExpense.toFixed(2)),
         balance: Number(balance.toFixed(2)),
-        totalPrivate: Number(totalPrivate.toFixed(2)),
+        totalPrivate: Number(myPrivateExpenses.toFixed(2)),
         totalShared: Number(totalShared.toFixed(2)),
         userShareOfShared: Number(userShareOfShared.toFixed(2)),
         partnerPrivate: Number(partnerPrivate.toFixed(2)),

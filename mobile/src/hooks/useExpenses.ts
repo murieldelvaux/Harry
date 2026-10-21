@@ -61,6 +61,14 @@ export function useExpenses(filters: {
   return {
     expenses: expensesQuery.data?.items || [],
     summary: expensesQuery.data?.summary || {
+      myIncome: 0,
+      myPrivateExpenses: 0,
+      myShareOfSharedExpenses: 0,
+      myTotalExpenses: 0,
+      myBalance: 0,
+      jointIncome: 0,
+      jointExpenses: 0,
+      jointBalance: 0,
       totalIncome: 0,
       totalExpense: 0,
       balance: 0,

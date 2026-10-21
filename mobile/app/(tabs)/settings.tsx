@@ -402,7 +402,7 @@ export default function ProfileScreen() {
 
           <View style={[styles.tipBanner, { backgroundColor: theme.surfaceSubtle }]}>
             <Text style={[styles.tipText, { color: theme.textSecondary }]}>
-              💡 <Text style={{ fontWeight: '700' }}>Como na Alexa:</Text> Sempre inicie suas mensagens com <Text style={{ fontWeight: '700', color: theme.primary }}>"Harry"</Text>! Ex: <Text style={{ fontStyle: 'italic' }}>"Harry, gastei 50 no mercado hoje"</Text>, <Text style={{ fontStyle: 'italic' }}>"Harry, agendar dentista amanhã às 14h"</Text> ou <Text style={{ fontStyle: 'italic' }}>"Harry, colocar café na lista"</Text>.
+              💡 <Text style={{ fontWeight: '700' }}>Como falar com o Harry:</Text> Sempre inicie suas mensagens com <Text style={{ fontWeight: '700', color: theme.primary }}>"Harry"</Text>! Ex: <Text style={{ fontStyle: 'italic' }}>"Harry, gastei 50 no mercado hoje"</Text>, <Text style={{ fontStyle: 'italic' }}>"Harry, agendar dentista amanhã às 14h"</Text> ou <Text style={{ fontStyle: 'italic' }}>"Harry, colocar café na lista"</Text>.
             </Text>
           </View>
         </View>

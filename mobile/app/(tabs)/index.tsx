@@ -32,15 +32,21 @@ export default function DashboardScreen() {
     scope: activeScope,
   });
 
-  const totalGeral =
-    (summary?.totalShared || 0) +
-    (summary?.totalPrivate || 0) +
-    (summary?.partnerPrivate || 0);
+  const [dashboardBalanceMode, setDashboardBalanceMode] = useState<'INDIVIDUAL' | 'JOINT'>('INDIVIDUAL');
 
-  const totalIncome = summary?.totalIncome ?? 0;
-  const totalExpense = summary?.totalExpense ?? totalGeral;
-  const balance = summary?.balance ?? (totalIncome - totalExpense);
-  const isPositiveBalance = balance >= 0;
+  // Balanço Individual (Visão Pessoal do Usuário)
+  const myIncome = summary?.myIncome ?? (summary?.totalIncome ?? 0);
+  const myPrivateExpenses = summary?.myPrivateExpenses ?? (summary?.totalPrivate ?? 0);
+  const myShareOfShared = summary?.myShareOfSharedExpenses ?? (summary?.userShareOfShared ?? 0);
+  const myTotalExpenses = summary?.myTotalExpenses ?? (myPrivateExpenses + myShareOfShared);
+  const myBalance = summary?.myBalance ?? (myIncome - myTotalExpenses);
+  const isMyPositiveBalance = myBalance >= 0;
+
+  // Balanço em Conjunto (Visão Casal / Casa)
+  const jointIncome = summary?.jointIncome ?? (summary?.totalIncome ?? 0);
+  const jointExpenses = summary?.jointExpenses ?? (summary?.totalShared ?? 0);
+  const jointBalance = summary?.jointBalance ?? (jointIncome - jointExpenses);
+  const isJointPositiveBalance = jointBalance >= 0;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -65,7 +71,7 @@ export default function DashboardScreen() {
           </Text>
         </View>
 
-        {/* HERO CARD FINANCEIRO (BALANÇO GERAL) */}
+        {/* HERO CARD FINANCEIRO (BALANÇO INDIVIDUAL vs EM CONJUNTO) */}
         <View
           style={[
             styles.heroCard,
@@ -76,119 +82,287 @@ export default function DashboardScreen() {
             theme.cardShadow,
           ]}
         >
-          <View style={styles.heroTop}>
-            <View>
-              <Text style={[styles.heroLabel, { color: theme.textSecondary }]}>
-                Balanço do Mês
-              </Text>
-              <Text style={{ fontSize: 11, color: theme.textMuted, marginTop: 1 }}>
-                Entradas menos Saídas
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.statusPill,
-                {
-                  backgroundColor: isPositiveBalance
-                    ? 'rgba(16, 185, 129, 0.12)'
-                    : 'rgba(239, 68, 68, 0.12)',
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.statusPillText,
-                  { color: isPositiveBalance ? '#059669' : '#DC2626', fontWeight: '700' },
-                ]}
-              >
-                {isPositiveBalance ? '🟢 Saldo Positivo' : '🔴 Em Déficit'}
-              </Text>
-            </View>
-          </View>
-
-          <Text
-            style={[
-              styles.heroValue,
-              { color: isPositiveBalance ? (isDark ? '#34D399' : '#059669') : '#DC2626' },
-            ]}
-          >
-            {isPositiveBalance ? `+ ${formatCurrency(balance)}` : `- ${formatCurrency(Math.abs(balance))}`}
-          </Text>
-
-          {/* TOTAL ENTRADAS E SAÍDAS */}
+          {/* SELETOR DE MODO DE BALANÇO */}
           <View
             style={[
-              styles.inOutHeroRow,
+              styles.balanceModeToggle,
               { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
             ]}
           >
-            <View style={styles.inOutHeroItem}>
-              <Text style={[styles.inOutHeroLabel, { color: theme.textSecondary }]}>
-                ↗️ Ganhos (Entradas)
+            <TouchableOpacity
+              style={[
+                styles.balanceModeBtn,
+                dashboardBalanceMode === 'INDIVIDUAL' && {
+                  backgroundColor: theme.primary,
+                  borderColor: theme.primary,
+                  elevation: 2,
+                },
+              ]}
+              onPress={() => setDashboardBalanceMode('INDIVIDUAL')}
+              activeOpacity={0.8}
+            >
+              <Text
+                style={[
+                  styles.balanceModeText,
+                  {
+                    color: dashboardBalanceMode === 'INDIVIDUAL' ? '#FFFFFF' : theme.textSecondary,
+                    fontWeight: dashboardBalanceMode === 'INDIVIDUAL' ? '700' : '600',
+                  },
+                ]}
+              >
+                👤 Meu Balanço (Individual)
               </Text>
-              <Text style={[styles.inOutHeroValue, { color: '#059669' }]}>
-                + {formatCurrency(totalIncome)}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.balanceModeBtn,
+                dashboardBalanceMode === 'JOINT' && {
+                  backgroundColor: '#8B5CF6',
+                  borderColor: '#8B5CF6',
+                  elevation: 2,
+                },
+              ]}
+              onPress={() => setDashboardBalanceMode('JOINT')}
+              activeOpacity={0.8}
+            >
+              <Text
+                style={[
+                  styles.balanceModeText,
+                  {
+                    color: dashboardBalanceMode === 'JOINT' ? '#FFFFFF' : theme.textSecondary,
+                    fontWeight: dashboardBalanceMode === 'JOINT' ? '700' : '600',
+                  },
+                ]}
+              >
+                👥 Em Conjunto (Casal)
               </Text>
-            </View>
-            <View style={[styles.inOutHeroDivider, { backgroundColor: theme.border }]} />
-            <View style={styles.inOutHeroItem}>
-              <Text style={[styles.inOutHeroLabel, { color: theme.textSecondary }]}>
-                ↘️ Gastos (Saídas)
-              </Text>
-              <Text style={[styles.inOutHeroValue, { color: '#DC2626' }]}>
-                - {formatCurrency(totalExpense)}
-              </Text>
-            </View>
+            </TouchableOpacity>
           </View>
 
-          {/* DIVISÃO COMPARTILHADA VS PRIVADA */}
-          <View style={[styles.splitMetricsRow, { borderTopColor: theme.border }]}>
-            <View style={styles.splitMetricItem}>
-              <View style={styles.splitIconLabel}>
-                <Text style={{ fontSize: 13 }}>🏠</Text>
-                <Text style={[styles.splitLabel, { color: theme.textSecondary }]}>Gastos Compartilhados</Text>
-              </View>
-              <Text style={[styles.splitValue, { color: theme.primary }]}>
-                {formatCurrency(summary?.totalShared || 0)}
-              </Text>
-              <Text style={[styles.splitSub, { color: theme.textMuted }]}>
-                Sua parte: {formatCurrency(summary?.userShareOfShared || 0)}
-              </Text>
-            </View>
-
-            <View style={[styles.verticalDivider, { backgroundColor: theme.border }]} />
-
-            <View style={styles.splitMetricItem}>
-              <View style={styles.splitIconLabel}>
-                <Text style={{ fontSize: 13 }}>🔒</Text>
-                <Text style={[styles.splitLabel, { color: theme.textSecondary }]}>Seus Gastos</Text>
-              </View>
-              <Text style={[styles.splitValue, { color: theme.textPrimary }]}>
-                {formatCurrency(summary?.totalPrivate || 0)}
-              </Text>
-              <Text style={[styles.splitSub, { color: theme.textMuted }]}>
-                Individual
-              </Text>
-            </View>
-
-            {!!summary?.partnerPrivate && summary.partnerPrivate > 0 ? (
-              <>
-                <View style={[styles.verticalDivider, { backgroundColor: theme.border }]} />
-                <View style={styles.splitMetricItem}>
-                  <View style={styles.splitIconLabel}>
-                    <Text style={{ fontSize: 13 }}>👁️</Text>
-                    <Text style={[styles.splitLabel, { color: theme.textSecondary }]}>Privado do Par</Text>
-                  </View>
-                  <Text style={[styles.splitValue, { color: '#8B5CF6' }]}>
-                    {formatCurrency(summary.partnerPrivate)}
+          {dashboardBalanceMode === 'INDIVIDUAL' ? (
+            <>
+              {/* TOPO: MEU SALDO INDIVIDUAL */}
+              <View style={styles.heroTop}>
+                <View>
+                  <Text style={[styles.heroLabel, { color: theme.textSecondary }]}>
+                    Meu Saldo Individual
                   </Text>
-                  <Text style={[styles.splitSub, { color: theme.textMuted }]}>
-                    Compartilhado
+                  <Text style={{ fontSize: 11, color: theme.textMuted, marginTop: 1 }}>
+                    Suas entradas menos suas despesas reais
                   </Text>
                 </View>
-              </>
-            ) : null}
-          </View>
+                <View
+                  style={[
+                    styles.statusPill,
+                    {
+                      backgroundColor: isMyPositiveBalance
+                        ? 'rgba(16, 185, 129, 0.12)'
+                        : 'rgba(239, 68, 68, 0.12)',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statusPillText,
+                      { color: isMyPositiveBalance ? '#059669' : '#DC2626', fontWeight: '700' },
+                    ]}
+                  >
+                    {isMyPositiveBalance ? '🟢 Saldo Positivo' : '🔴 Em Déficit'}
+                  </Text>
+                </View>
+              </View>
+
+              <Text
+                style={[
+                  styles.heroValue,
+                  { color: isMyPositiveBalance ? (isDark ? '#34D399' : '#059669') : '#DC2626' },
+                ]}
+              >
+                {isMyPositiveBalance ? `+ ${formatCurrency(myBalance)}` : `- ${formatCurrency(Math.abs(myBalance))}`}
+              </Text>
+
+              {/* TOTAL ENTRADAS E SAÍDAS INDIVIDUAIS */}
+              <View
+                style={[
+                  styles.inOutHeroRow,
+                  { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+                ]}
+              >
+                <View style={styles.inOutHeroItem}>
+                  <Text style={[styles.inOutHeroLabel, { color: theme.textSecondary }]}>
+                    ↗️ Meus Ganhos
+                  </Text>
+                  <Text style={[styles.inOutHeroValue, { color: '#059669' }]}>
+                    + {formatCurrency(myIncome)}
+                  </Text>
+                </View>
+                <View style={[styles.inOutHeroDivider, { backgroundColor: theme.border }]} />
+                <View style={styles.inOutHeroItem}>
+                  <Text style={[styles.inOutHeroLabel, { color: theme.textSecondary }]}>
+                    ↘️ Meus Gastos Reais
+                  </Text>
+                  <Text style={[styles.inOutHeroValue, { color: '#DC2626' }]}>
+                    - {formatCurrency(myTotalExpenses)}
+                  </Text>
+                </View>
+              </View>
+
+              {/* COMPOSIÇÃO DOS GASTOS DO USUÁRIO */}
+              <View style={[styles.splitMetricsRow, { borderTopColor: theme.border }]}>
+                <View style={styles.splitMetricItem}>
+                  <View style={styles.splitIconLabel}>
+                    <Text style={{ fontSize: 13 }}>🔒</Text>
+                    <Text style={[styles.splitLabel, { color: theme.textSecondary }]}>Seus Gastos Privados</Text>
+                  </View>
+                  <Text style={[styles.splitValue, { color: theme.textPrimary }]}>
+                    {formatCurrency(myPrivateExpenses)}
+                  </Text>
+                  <Text style={[styles.splitSub, { color: theme.textMuted }]}>
+                    100% individual seu
+                  </Text>
+                </View>
+
+                <View style={[styles.verticalDivider, { backgroundColor: theme.border }]} />
+
+                <View style={styles.splitMetricItem}>
+                  <View style={styles.splitIconLabel}>
+                    <Text style={{ fontSize: 13 }}>🏠</Text>
+                    <Text style={[styles.splitLabel, { color: theme.textSecondary }]}>Sua Cota da Casa (50%)</Text>
+                  </View>
+                  <Text style={[styles.splitValue, { color: theme.primary }]}>
+                    {formatCurrency(myShareOfShared)}
+                  </Text>
+                  <Text style={[styles.splitSub, { color: theme.textMuted }]}>
+                    Metade dos compartilhados
+                  </Text>
+                </View>
+              </View>
+
+              <View style={[styles.individualNoticeBox, { backgroundColor: theme.surfaceSubtle }]}>
+                <Text style={[styles.individualNoticeText, { color: theme.textMuted }]}>
+                  🛡️ <Text style={{ fontWeight: '600' }}>Finanças Justas:</Text> Os gastos individuais do seu parceiro NÃO são descontados do seu balanço.
+                </Text>
+              </View>
+            </>
+          ) : (
+            <>
+              {/* TOPO: BALANÇO EM CONJUNTO */}
+              <View style={styles.heroTop}>
+                <View>
+                  <Text style={[styles.heroLabel, { color: theme.textSecondary }]}>
+                    Balanço em Conjunto (Casal)
+                  </Text>
+                  <Text style={{ fontSize: 11, color: theme.textMuted, marginTop: 1 }}>
+                    Contas e despesas da residência
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.statusPill,
+                    {
+                      backgroundColor: isJointPositiveBalance
+                        ? 'rgba(139, 92, 246, 0.15)'
+                        : 'rgba(239, 68, 68, 0.12)',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statusPillText,
+                      { color: isJointPositiveBalance ? '#8B5CF6' : '#DC2626', fontWeight: '700' },
+                    ]}
+                  >
+                    {isJointPositiveBalance ? '👥 Superávit Casa' : '🔴 Déficit Casa'}
+                  </Text>
+                </View>
+              </View>
+
+              <Text
+                style={[
+                  styles.heroValue,
+                  { color: isJointPositiveBalance ? (isDark ? '#34D399' : '#059669') : '#DC2626' },
+                ]}
+              >
+                {isJointPositiveBalance ? `+ ${formatCurrency(jointBalance)}` : `- ${formatCurrency(Math.abs(jointBalance))}`}
+              </Text>
+
+              {/* TOTAL ENTRADAS E SAÍDAS CONJUNTAS */}
+              <View
+                style={[
+                  styles.inOutHeroRow,
+                  { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+                ]}
+              >
+                <View style={styles.inOutHeroItem}>
+                  <Text style={[styles.inOutHeroLabel, { color: theme.textSecondary }]}>
+                    ↗️ Renda Conjunta
+                  </Text>
+                  <Text style={[styles.inOutHeroValue, { color: '#059669' }]}>
+                    + {formatCurrency(jointIncome)}
+                  </Text>
+                </View>
+                <View style={[styles.inOutHeroDivider, { backgroundColor: theme.border }]} />
+                <View style={styles.inOutHeroItem}>
+                  <Text style={[styles.inOutHeroLabel, { color: theme.textSecondary }]}>
+                    ↘️ Despesas da Casa
+                  </Text>
+                  <Text style={[styles.inOutHeroValue, { color: '#DC2626' }]}>
+                    - {formatCurrency(jointExpenses)}
+                  </Text>
+                </View>
+              </View>
+
+              {/* DIVISÃO DAS CONTAS DA CASA */}
+              <View style={[styles.splitMetricsRow, { borderTopColor: theme.border }]}>
+                <View style={styles.splitMetricItem}>
+                  <View style={styles.splitIconLabel}>
+                    <Text style={{ fontSize: 13 }}>🏠</Text>
+                    <Text style={[styles.splitLabel, { color: theme.textSecondary }]}>Total da Casa</Text>
+                  </View>
+                  <Text style={[styles.splitValue, { color: theme.primary }]}>
+                    {formatCurrency(summary?.totalShared || 0)}
+                  </Text>
+                  <Text style={[styles.splitSub, { color: theme.textMuted }]}>
+                    Contas compartilhadas
+                  </Text>
+                </View>
+
+                <View style={[styles.verticalDivider, { backgroundColor: theme.border }]} />
+
+                <View style={styles.splitMetricItem}>
+                  <View style={styles.splitIconLabel}>
+                    <Text style={{ fontSize: 13 }}>⚖️</Text>
+                    <Text style={[styles.splitLabel, { color: theme.textSecondary }]}>Divisão 50/50</Text>
+                  </View>
+                  <Text style={[styles.splitValue, { color: theme.textPrimary }]}>
+                    {formatCurrency(summary?.userShareOfShared || 0)} cada
+                  </Text>
+                  <Text style={[styles.splitSub, { color: theme.textMuted }]}>
+                    Sua parte e do par
+                  </Text>
+                </View>
+
+                {!!summary?.partnerPrivate && summary.partnerPrivate > 0 ? (
+                  <>
+                    <View style={[styles.verticalDivider, { backgroundColor: theme.border }]} />
+                    <View style={styles.splitMetricItem}>
+                      <View style={styles.splitIconLabel}>
+                        <Text style={{ fontSize: 13 }}>👁️</Text>
+                        <Text style={[styles.splitLabel, { color: theme.textSecondary }]}>Privado do Par</Text>
+                      </View>
+                      <Text style={[styles.splitValue, { color: '#8B5CF6' }]}>
+                        {formatCurrency(summary.partnerPrivate)}
+                      </Text>
+                      <Text style={[styles.splitSub, { color: theme.textMuted }]}>
+                        Individual dele
+                      </Text>
+                    </View>
+                  </>
+                ) : null}
+              </View>
+            </>
+          )}
         </View>
 
         {/* ATALHOS RÁPIDOS NA ZONA DO POLEGAR */}
@@ -616,5 +790,35 @@ const styles = StyleSheet.create({
     width: StyleSheet.hairlineWidth,
     height: 32,
     marginHorizontal: 10,
+  },
+  balanceModeToggle: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 16,
+    borderWidth: 1,
+    gap: 4,
+  },
+  balanceModeBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  balanceModeText: {
+    fontSize: 12,
+  },
+  individualNoticeBox: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginTop: 12,
+  },
+  individualNoticeText: {
+    fontSize: 11,
+    lineHeight: 15,
   },
 });

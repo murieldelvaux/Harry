@@ -134,6 +134,19 @@ export interface ExpenseDto {
 }
 
 export interface ExpensesSummaryDto {
+  // Balanço Individual (Visão Pessoal do Usuário)
+  myIncome: number;
+  myPrivateExpenses: number;
+  myShareOfSharedExpenses: number;
+  myTotalExpenses: number;
+  myBalance: number;
+
+  // Balanço em Conjunto (Visão Casal / Casa)
+  jointIncome: number;
+  jointExpenses: number;
+  jointBalance: number;
+
+  // Totais Gerais
   totalIncome: number;
   totalExpense: number;
   balance: number;
