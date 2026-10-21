@@ -82,7 +82,6 @@ export default function ExpensesScreen() {
   // Format month string "YYYY-MM"
   const currentMonthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
 
-  const backendScope = activeScope === 'PARTNER' ? 'PRIVATE' : activeScope;
   const {
     expenses: rawExpenses,
     summary,
@@ -101,20 +100,31 @@ export default function ExpensesScreen() {
         startDate: appliedPeriod.start,
         endDate: appliedPeriod.end,
       }),
-    scope: backendScope,
-    type: activeType === 'ALL' ? undefined : activeType,
   });
 
   const expenses = useMemo(() => {
-    if (!rawExpenses) return [];
-    if (activeScope === 'PARTNER') {
-      return rawExpenses.filter((e) => e.scope === 'PRIVATE' && !!user?.id && e.userId !== user.id);
+    if (!rawExpenses || !Array.isArray(rawExpenses)) return [];
+    let list = rawExpenses;
+
+    // Filtro por Tipo (Gasto ou Ganho)
+    if (activeType === 'EXPENSE') {
+      list = list.filter((e) => e?.type !== TransactionType.INCOME);
+    } else if (activeType === 'INCOME') {
+      list = list.filter((e) => e?.type === TransactionType.INCOME);
     }
-    if (activeScope === 'PRIVATE') {
-      return rawExpenses.filter((e) => e.scope === 'PRIVATE' && (!user?.id || e.userId === user.id));
+
+    // Filtro por Escopo
+    if (activeScope === 'SHARED') {
+      list = list.filter((e) => e?.scope === 'SHARED');
+    } else if (activeScope === 'PRIVATE') {
+      list = list.filter((e) => e?.scope === 'PRIVATE' && (!user?.id || e.userId === user.id));
+    } else if (activeScope === 'PARTNER') {
+      list = list.filter((e) => e?.scope === 'PRIVATE' && !!user?.id && e.userId !== user.id);
     }
-    return rawExpenses;
-  }, [rawExpenses, activeScope, user?.id]);
+
+    return list;
+  }, [rawExpenses, activeScope, activeType, user?.id]);
+
 
   // Navigation handlers for month
   const handlePrevMonth = () => {
