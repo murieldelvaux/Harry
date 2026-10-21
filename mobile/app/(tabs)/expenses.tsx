@@ -333,15 +333,6 @@ export default function ExpensesScreen() {
   const jointBalance = summary?.jointBalance ?? (jointIncome - jointExpenses);
   const isJointPositiveBalance = jointBalance >= 0;
 
-  const incomeCount = useMemo(
-    () => rawExpenses?.filter((e) => e.type === TransactionType.INCOME).length || 0,
-    [rawExpenses]
-  );
-  const expenseCount = useMemo(
-    () => rawExpenses?.filter((e) => e.type !== TransactionType.INCOME).length || 0,
-    [rawExpenses]
-  );
-
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <AppHeader title="Harry" subtitle="Financeiro & Extrato" />
