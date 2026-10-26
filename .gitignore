@@ -8,6 +8,8 @@ node_modules/
 
 # Testing
 coverage/
+playwright-report/
+test-results/
 
 # Production / Build outputs
 dist/
