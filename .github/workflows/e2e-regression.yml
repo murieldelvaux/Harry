@@ -24,7 +24,7 @@ jobs:
 
     env:
       CI: true
-      NODE_ENV: test
+      NODE_ENV: production
       EXPO_PUBLIC_API_URL: http://localhost:8081/api/v1
 
     steps:
@@ -43,8 +43,8 @@ jobs:
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Build Shared Packages
-        run: npm run build:shared
+      - name: Build Web Application
+        run: npm run build:web
 
       - name: Run E2E Playwright Tests
         run: npm run test:e2e

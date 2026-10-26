@@ -33,9 +33,11 @@ export default defineConfig({
   webServer: process.env.E2E_BASE_URL
     ? undefined
     : {
-        command: 'npm run dev:web',
+        command: process.env.CI
+          ? 'npx serve -s mobile/dist -l 8081'
+          : 'npm run dev:web',
         url: 'http://localhost:8081',
-        reuseExistingServer: true,
+        reuseExistingServer: !process.env.CI,
         timeout: 120 * 1000,
       },
 });
