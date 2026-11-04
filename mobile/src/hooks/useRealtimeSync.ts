@@ -39,8 +39,7 @@ export function useRealtimeSync(enabled: boolean = true) {
             const data = JSON.parse(event.data);
             if (data.type === 'HEARTBEAT') return;
 
-            // Invalidação imediata (0ms) no TanStack Query
-            if (data.type === 'EXPENSE_CREATED' || data.type === 'REFETCH') {
+            if (data.type === 'EXPENSE_CREATED' || data.type === 'SETTLEMENT_UPDATED' || data.type === 'REFETCH') {
               queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all, refetchType: 'all' });
               queryClient.invalidateQueries({ queryKey: queryKeys.household.current, refetchType: 'all' });
               queryClient.invalidateQueries({ queryKey: queryKeys.goals.all, refetchType: 'all' });
@@ -53,6 +52,10 @@ export function useRealtimeSync(enabled: boolean = true) {
               queryClient.invalidateQueries({ queryKey: queryKeys.shoppingList.all, refetchType: 'all' });
             } else if (data.type === 'CALENDAR_UPDATED' || data.type === 'EVENT_CREATED') {
               queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all, refetchType: 'all' });
+            } else if (data.type === 'NOTIFICATION_CREATED') {
+              queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all, refetchType: 'all' });
+            } else if (data.type === 'WORKOUT_UPDATED') {
+              queryClient.invalidateQueries({ queryKey: queryKeys.workouts.all, refetchType: 'all' });
             }
           } catch {
             // Ignora erro de parse em pacotes não-json
@@ -61,7 +64,6 @@ export function useRealtimeSync(enabled: boolean = true) {
 
         es.onerror = () => {
           es.close();
-          // Reconectar rapidamente após 1.5 segundos
           if (isMounted) {
             reconnectTimeout = setTimeout(connectSSE, 1500);
           }

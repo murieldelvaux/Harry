@@ -3,11 +3,13 @@ import axios from 'axios';
 import crypto from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { RealtimeService } from '../../common/realtime/realtime.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   CreateCalendarEventDto,
   UpdateCalendarEventDto,
   RecordScope,
   GoogleCalendarItemDto,
+  NotificationType,
 } from '../../../../packages/shared/src';
 import { GoogleCalendarMcpServer } from './google-calendar-mcp.server';
 import { Context7Manager } from './context7.config';
@@ -21,6 +23,7 @@ export class CalendarService {
   constructor(
     private prisma: PrismaService,
     private realtimeService: RealtimeService,
+    private notificationsService: NotificationsService,
   ) {
     this.mcpServer = new GoogleCalendarMcpServer();
   }
@@ -282,6 +285,31 @@ export class CalendarService {
       householdId: isShared ? householdId : null,
       data: { action: 'CREATE', eventId: created.id },
     });
+
+    if (isShared && householdId) {
+      const dateFormatted = created.startDate.toLocaleDateString('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        day: '2-digit',
+        month: '2-digit',
+      });
+      const timeFormatted = created.isAllDay
+        ? 'Dia inteiro'
+        : created.startDate.toLocaleTimeString('pt-BR', {
+            timeZone: 'America/Sao_Paulo',
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+
+      await this.notificationsService.notifyHouseholdPartners({
+        actorUserId: userId,
+        householdId,
+        type: NotificationType.SHARED_EVENT_CREATED,
+        title: '📅 Novo Compromisso na Agenda do Casal',
+        body: `${user?.name || 'Seu par'} agendou "${created.title}" para ${dateFormatted} (${timeFormatted}).`,
+        deepLink: '/(tabs)/calendar',
+        metadata: { eventId: created.id, startDate: created.startDate.toISOString() },
+      });
+    }
 
     return created;
   }

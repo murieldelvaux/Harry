@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,9 @@ import {
 } from 'react-native';
 import { useDrawer } from '../context/DrawerContext';
 import { useTheme } from '../theme/ThemeContext';
+import { useAuth } from '../hooks/useAuth';
+import { useNotifications } from '../hooks/useNotifications';
+import { NotificationCenterModal } from './NotificationCenterModal';
 
 const HarryLogo = require('../../assets/harry-logo.png');
 
@@ -20,12 +23,17 @@ interface AppHeaderProps {
 export function AppHeader({ title, subtitle, rightAction }: AppHeaderProps) {
   const { openDrawer } = useDrawer();
   const { theme, isDark, toggleTheme } = useTheme();
+  const { isAuthenticated } = useAuth();
+  const { unreadCount } = useNotifications(isAuthenticated);
+  const [notifModalOpen, setNotifModalOpen] = useState(false);
 
   return (
     <View style={[styles.headerContainer, { borderBottomColor: theme.border, backgroundColor: theme.surface }]}>
       {/* Botão Hambúrguer para abrir Menu Lateral + Logo */}
       <View style={styles.leftGroup}>
         <TouchableOpacity
+          testID="open-drawer-button"
+          accessibilityLabel="Abrir menu lateral"
           onPress={openDrawer}
           style={[styles.menuBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}
           activeOpacity={0.7}
@@ -48,12 +56,33 @@ export function AppHeader({ title, subtitle, rightAction }: AppHeaderProps) {
         </TouchableOpacity>
       </View>
 
-      {/* Ações da Direita: Toggle de Tema ou Ação Personalizada */}
+      {/* Ações da Direita: Sino de Notificações + Toggle de Tema ou Ação Personalizada */}
       <View style={styles.rightGroup}>
+        <TouchableOpacity
+          testID="notification-bell"
+          accessibilityLabel="Central de notificações"
+          onPress={() => setNotifModalOpen(true)}
+          style={[styles.bellBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.bellIcon}>🔔</Text>
+          {unreadCount > 0 && (
+            <View
+              testID="notification-badge"
+              style={[styles.badge, { backgroundColor: theme.danger }]}
+            >
+              <Text style={styles.badgeText}>
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
         {rightAction ? (
           rightAction
         ) : (
           <TouchableOpacity
+            testID="theme-toggle-button"
             onPress={toggleTheme}
             style={[styles.themeToggleBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}
             activeOpacity={0.7}
@@ -65,6 +94,11 @@ export function AppHeader({ title, subtitle, rightAction }: AppHeaderProps) {
           </TouchableOpacity>
         )}
       </View>
+
+      <NotificationCenterModal
+        visible={notifModalOpen}
+        onClose={() => setNotifModalOpen(false)}
+      />
     </View>
   );
 }
@@ -121,6 +155,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  bellBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  bellIcon: {
+    fontSize: 15,
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
   },
   themeToggleBtn: {
     flexDirection: 'row',

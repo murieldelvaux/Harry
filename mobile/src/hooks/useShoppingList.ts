@@ -17,8 +17,21 @@ export function useShoppingList(scope?: RecordScope) {
     refetchInterval: 4000,
   });
 
+  const topItemsQuery = useQuery({
+    queryKey: queryKeys.shoppingList.topItems(),
+    queryFn: () => shoppingListService.getTopItems(12),
+  });
+
   const createMutation = useMutation({
     mutationFn: (dto: CreateShoppingItemDto) => shoppingListService.create(dto),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.shoppingList.all });
+    },
+  });
+
+  const readdMutation = useMutation({
+    mutationFn: (dto: { name: string; category?: string; quantity?: string; scope?: RecordScope }) =>
+      shoppingListService.readdItem(dto),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.shoppingList.all });
     },
@@ -27,7 +40,6 @@ export function useShoppingList(scope?: RecordScope) {
   const toggleMutation = useMutation({
     mutationFn: (id: string) => shoppingListService.toggle(id),
     onMutate: async (id: string) => {
-      // Optimistic update for instant feedback when tapping checkbox
       await queryClient.cancelQueries({ queryKey: queryKeys.shoppingList.all });
       const previous = queryClient.getQueryData<ShoppingItemDto[]>(queryKeys.shoppingList.list(scope));
       if (previous) {
@@ -88,12 +100,16 @@ export function useShoppingList(scope?: RecordScope) {
     items: allItems,
     pendingItems,
     completedItems,
+    topItems: topItemsQuery.data || [],
+    isLoadingTopItems: topItemsQuery.isLoading,
     isLoading: listQuery.isLoading,
     isRefetching: listQuery.isRefetching,
     isError: listQuery.isError,
     refetch: listQuery.refetch,
     createItem: createMutation.mutateAsync,
     isCreating: createMutation.isPending,
+    readdItem: readdMutation.mutateAsync,
+    isReadding: readdMutation.isPending,
     toggleItem: toggleMutation.mutateAsync,
     updateItem: updateMutation.mutateAsync,
     isUpdating: updateMutation.isPending,

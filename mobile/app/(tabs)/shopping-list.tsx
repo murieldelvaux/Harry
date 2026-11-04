@@ -37,11 +37,14 @@ export default function ShoppingListScreen() {
     items,
     pendingItems,
     completedItems,
+    topItems,
     isLoading,
     isRefetching,
     refetch,
     createItem,
     isCreating,
+    readdItem,
+    isReadding,
     toggleItem,
     updateItem,
     deleteItem,
@@ -461,6 +464,112 @@ export default function ShoppingListScreen() {
             <Text style={{ fontWeight: '700' }}>Adicione com o Harry:</Text> Mande mensagem dizendo "Harry, colocar café na lista..." ou envie áudio e foto de lista no papel!
           </Text>
         </View>
+
+        {/* TASK 10: ANÁLISE DO QUE MAIS COLOCAMOS EM LISTA DE COMPRAS */}
+        {topItems.length > 0 && (
+          <View
+            testID="shopping-top-items-section"
+            style={[
+              styles.quickAddCard,
+              {
+                backgroundColor: theme.surface,
+                borderColor: theme.border,
+                marginBottom: 16,
+              },
+              theme.cardShadow,
+            ]}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <View>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: theme.textPrimary }}>
+                  🔥 Mais Comprados pelo Casal
+                </Text>
+                <Text style={{ fontSize: 11.5, color: theme.textSecondary, marginTop: 2 }}>
+                  Ranking inteligente de frequência e reposição em 1 toque
+                </Text>
+              </View>
+            </View>
+
+            <View style={{ gap: 8 }}>
+              {topItems.slice(0, 6).map((top, index) => (
+                <View
+                  key={top.normalizedName}
+                  testID={`top-shopping-item-${top.normalizedName}`}
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingVertical: 8,
+                    paddingHorizontal: 10,
+                    borderRadius: 12,
+                    backgroundColor: theme.surfaceSubtle,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                  }}
+                >
+                  <View style={{ flex: 1, marginRight: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: theme.primary }}>
+                        #{index + 1}
+                      </Text>
+                      <Text style={{ fontSize: 13.5, fontWeight: '700', color: theme.textPrimary }} numberOfLines={1}>
+                        {top.displayName}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: theme.textSecondary }}>
+                        🔄 {top.purchaseCount}x na lista
+                      </Text>
+                      {top.frequencyLabel ? (
+                        <Text style={{ fontSize: 11, color: theme.textMuted }}>
+                          • {top.frequencyLabel}
+                        </Text>
+                      ) : null}
+                      {top.category ? (
+                        <Text style={{ fontSize: 11, color: theme.textMuted }}>
+                          • {top.category}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    testID={`readd-shopping-item-${top.normalizedName.replace(/\s+/g, '-')}`}
+                    accessibilityLabel={`Adicionar novamente ${top.displayName}`}
+                    disabled={isReadding}
+                    onPress={() =>
+                      readdItem({
+                        name: top.displayName,
+                        category: top.category,
+                        scope: quickScope,
+                      })
+                    }
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: 10,
+                      backgroundColor: top.isCurrentlyInList
+                        ? theme.surface
+                        : theme.primaryLight,
+                      borderWidth: 1,
+                      borderColor: theme.primary,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11.5,
+                        fontWeight: '700',
+                        color: theme.primary,
+                      }}
+                    >
+                      {top.isCurrentlyInList ? '＋ Mais 1' : '＋ Adicionar novamente'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* SEÇÃO 1: ITENS PARA COMPRAR (PENDENTES) */}
         <View style={styles.sectionHeader}>

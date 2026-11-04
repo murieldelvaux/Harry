@@ -8,7 +8,6 @@ import {
   Body,
   Param,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import { ShoppingListService } from './shopping-list.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -44,6 +43,22 @@ export class ShoppingListController {
     @Body() dto: { text?: string; fileBase64?: string; filename?: string; scope?: RecordScope },
   ) {
     return this.service.importSpreadsheet(userId, dto);
+  }
+
+  @Get('analytics/top-items')
+  async getTopItems(
+    @CurrentUser('userId') userId: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.getTopItems(userId, limit ? Number(limit) : 15);
+  }
+
+  @Post('readd')
+  async readdItem(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: { name: string; category?: string; quantity?: string; scope?: RecordScope },
+  ) {
+    return this.service.readdItem(userId, dto);
   }
 
   @Get()

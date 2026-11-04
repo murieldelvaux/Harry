@@ -13,6 +13,8 @@ import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { AiParserModule } from './modules/ai-parser/ai-parser.module';
 import { ShoppingListModule } from './modules/shopping-list/shopping-list.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { WorkoutsModule } from './modules/workouts/workouts.module';
 import { RealtimeModule } from './common/realtime/realtime.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
@@ -25,6 +27,7 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
     }),
     DatabaseModule,
     RealtimeModule,
+    NotificationsModule,
     MailModule,
     AuthModule,
     HouseholdModule,
@@ -35,6 +38,7 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
     AiParserModule,
     ShoppingListModule,
     CalendarModule,
+    WorkoutsModule,
   ],
   controllers: [AppController],
   providers: [

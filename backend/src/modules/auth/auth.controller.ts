@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Put } from '@nestjs/common';
+import { Controller, Post, Body, Get, Put, Headers } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -9,6 +9,7 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
   UpdateProfileDto,
+  RefreshTokenDto,
 } from '../../../../packages/shared/src';
 
 @Controller('auth')
@@ -25,6 +26,23 @@ export class AuthController {
   @Post('login')
   async login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Public()
+  @Post('refresh')
+  async refresh(
+    @Body() dto: RefreshTokenDto,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    return this.authService.refreshTokens(dto, userAgent);
+  }
+
+  @Post('logout')
+  async logout(
+    @CurrentUser('userId') userId: string,
+    @Body('refreshToken') refreshToken?: string,
+  ) {
+    return this.authService.logout(userId, refreshToken);
   }
 
   @Public()

@@ -1,7 +1,8 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
-import { RecordScope } from '../../../../packages/shared/src';
+import { NotificationsService } from '../notifications/notifications.service';
+import { RecordScope, NotificationType } from '../../../../packages/shared/src';
 
 @Injectable()
 export class DailyBriefingService implements OnModuleInit, OnModuleDestroy {
@@ -11,10 +12,11 @@ export class DailyBriefingService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private prisma: PrismaService,
     private whatsappService: WhatsappService,
+    private notificationsService: NotificationsService,
   ) {}
 
   onModuleInit() {
-    this.logger.log('Iniciando serviço de resumos diários e periódicos no WhatsApp...');
+    this.logger.log('Iniciando serviço de resumos diários e periódicos com controle de timezone e horário exato...');
     // Roda a cada 45 segundos
     this.timer = setInterval(() => this.checkDailyBriefings(), 45000);
     setTimeout(() => this.checkDailyBriefings(), 7000);
@@ -26,80 +28,141 @@ export class DailyBriefingService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private getLocalDateParts(now: Date, timeZone: string = 'America/Sao_Paulo') {
+    try {
+      const dateStr = now.toLocaleDateString('en-CA', { timeZone }); // YYYY-MM-DD
+      const timeStr = now.toLocaleTimeString('pt-BR', {
+        timeZone,
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      const [hStr, mStr] = timeStr.split(':');
+      const hour = parseInt(hStr || '0', 10);
+      const minute = parseInt(mStr || '0', 10);
+
+      // Obter dia da semana no timezone do usuário (0 = Dom ... 6 = Sáb)
+      const [y, mo, d] = dateStr.split('-').map((n) => parseInt(n, 10));
+      const dayOfWeek = new Date(Date.UTC(y, mo - 1, d, 12, 0, 0)).getUTCDay();
+
+      return { dateStr, hour, minute, dayOfWeek };
+    } catch {
+      const brasiliaDate = new Date(now.getTime() - 3 * 3600 * 1000);
+      return {
+        dateStr: brasiliaDate.toISOString().slice(0, 10),
+        hour: brasiliaDate.getUTCHours(),
+        minute: brasiliaDate.getUTCMinutes(),
+        dayOfWeek: brasiliaDate.getUTCDay(),
+      };
+    }
+  }
+
   async checkDailyBriefings() {
     try {
       const now = new Date();
-      // Fuso horário de Brasília (UTC-3)
-      const brasiliaDate = new Date(now.getTime() - 3 * 3600 * 1000);
-      const currHour = brasiliaDate.getUTCHours();
-      const currMin = brasiliaDate.getUTCMinutes();
-      const currDayOfWeek = brasiliaDate.getUTCDay(); // 0 = Domingo, 1 = Segunda...
-      const todayStr = brasiliaDate.toISOString().slice(0, 10);
 
-      // Busca usuários com telefone cadastrado e resumo diário ativado (ou null que é padrão true)
       const users = await this.prisma.user.findMany({
         where: {
-          phoneNumber: { not: null },
-          enableDailySummary: { not: false },
+          OR: [
+            { phoneNumber: { not: null } },
+            { enableDailySummary: true },
+          ],
         },
       });
 
       for (const user of users) {
-        if (!user.phoneNumber) continue;
+        const tz = user.timezone || 'America/Sao_Paulo';
+        const { dateStr: todayStr, hour: currHour, minute: currMin, dayOfWeek: currDayOfWeek } =
+          this.getLocalDateParts(now, tz);
 
-        // Horário configurado (default: "06:00")
-        const targetTime = user.dailySummaryTime || '06:00';
-        const [targetHourStr, targetMinStr] = targetTime.split(':');
-        const targetHour = parseInt(targetHourStr || '6', 10);
-        const targetMin = parseInt(targetMinStr || '0', 10);
+        // 1. Resumo Diário no Horário Exato configurado (ex.: "07:30")
+        if (user.enableDailySummary !== false) {
+          const targetTime = user.dailySummaryTime || '06:00';
+          const [targetHourStr, targetMinStr] = targetTime.split(':');
+          const targetHour = parseInt(targetHourStr || '6', 10);
+          const targetMin = parseInt(targetMinStr || '0', 10);
 
-        const isTimeForDaily =
-          currHour > targetHour || (currHour === targetHour && currMin >= targetMin);
+          const isTimeForDaily =
+            currHour > targetHour || (currHour === targetHour && currMin >= targetMin);
 
-        // 1. Resumo Diário
-        if (isTimeForDaily && user.lastDailySummaryDate !== todayStr) {
-          try {
-            await this.sendDailyBriefing(user, todayStr);
-            await this.prisma.user.update({
-              where: { id: user.id },
-              data: { lastDailySummaryDate: todayStr },
-            });
-          } catch (err: any) {
-            this.logger.error(`Falha ao disparar resumo diário para usuário ${user.id} (${user.name}): ${err.message}`);
+          const alreadySentDailyToday =
+            user.lastDailySummaryDate === todayStr ||
+            (user.lastDailySentAt &&
+              this.getLocalDateParts(new Date(user.lastDailySentAt), tz).dateStr === todayStr);
+
+          if (isTimeForDaily && !alreadySentDailyToday) {
+            try {
+              await this.sendDailyBriefing(user, todayStr);
+              await this.prisma.user.update({
+                where: { id: user.id },
+                data: {
+                  lastDailySummaryDate: todayStr,
+                  lastDailySentAt: now,
+                },
+              });
+            } catch (err: any) {
+              this.logger.error(`Falha ao disparar resumo diário para usuário ${user.id} (${user.name}): ${err.message}`);
+            }
           }
         }
 
-        // 2. Resumo Periódico (Semanal ou Quinzenal)
-        const summaryType = user.periodicSummaryType || 'none';
-        const summaryDay = user.periodicSummaryDay ?? 1; // 1 = Segunda-feira por padrão
+        // 2. Resumo Estendido (Semanal ou Quinzenal) no Dia da Semana e Horário Exato configurado
+        const rawSummaryType = (user.periodicSummaryType || 'none').toLowerCase();
+        const isWeekly = rawSummaryType === 'weekly';
+        const isBiweekly = rawSummaryType === 'biweekly';
 
-        if (summaryType !== 'none' && currDayOfWeek === summaryDay && currHour >= 6) {
-          let canSendPeriodic = user.lastPeriodicDate !== todayStr;
+        if (isWeekly || isBiweekly) {
+          const summaryDay = user.periodicSummaryDay ?? 1; // 0 = Domingo, 1 = Segunda...
+          const periodicTime = user.periodicSummaryTime || '08:00';
+          const [pHourStr, pMinStr] = periodicTime.split(':');
+          const pTargetHour = parseInt(pHourStr || '8', 10);
+          const pTargetMin = parseInt(pMinStr || '0', 10);
 
-          if (canSendPeriodic && summaryType === 'biweekly' && user.lastPeriodicDate) {
-            const lastDate = new Date(user.lastPeriodicDate);
-            const diffDays =
-              (brasiliaDate.getTime() - lastDate.getTime()) / (1000 * 3600 * 24);
-            if (diffDays < 12) {
-              canSendPeriodic = false;
+          const isTimeForPeriodic =
+            currDayOfWeek === summaryDay &&
+            (currHour > pTargetHour || (currHour === pTargetHour && currMin >= pTargetMin));
+
+          if (isTimeForPeriodic) {
+            const alreadySentPeriodicToday =
+              user.lastPeriodicDate === todayStr ||
+              (user.lastDigestSentAt &&
+                this.getLocalDateParts(new Date(user.lastDigestSentAt), tz).dateStr === todayStr);
+
+            let canSendPeriodic = !alreadySentPeriodicToday;
+
+            if (canSendPeriodic && isBiweekly) {
+              const refDate = user.lastDigestSentAt
+                ? new Date(user.lastDigestSentAt)
+                : user.lastPeriodicDate
+                  ? new Date(user.lastPeriodicDate)
+                  : null;
+              if (refDate) {
+                const diffDays = (now.getTime() - refDate.getTime()) / (1000 * 3600 * 24);
+                if (diffDays < 12) {
+                  canSendPeriodic = false;
+                }
+              }
             }
-          }
 
-          if (canSendPeriodic) {
-            try {
-              await this.sendPeriodicBriefing(user, summaryType);
-              await this.prisma.user.update({
-                where: { id: user.id },
-                data: { lastPeriodicDate: todayStr },
-              });
-            } catch (err: any) {
-              this.logger.error(`Falha ao disparar resumo periódico para usuário ${user.id}: ${err.message}`);
+            if (canSendPeriodic) {
+              try {
+                await this.sendPeriodicBriefing(user, isBiweekly ? 'biweekly' : 'weekly');
+                await this.prisma.user.update({
+                  where: { id: user.id },
+                  data: {
+                    lastPeriodicDate: todayStr,
+                    lastDigestSentAt: now,
+                  },
+                });
+              } catch (err: any) {
+                this.logger.error(`Falha ao disparar resumo periódico para usuário ${user.id}: ${err.message}`);
+              }
             }
           }
         }
       }
     } catch (error: any) {
-      if (!error?.message?.includes('Can\'t reach database server')) {
+      if (!error?.message?.includes("Can't reach database server")) {
         this.logger.error('Erro ao processar resumos diários/periódicos:', error);
       }
     }
@@ -115,8 +178,7 @@ export class DailyBriefingService implements OnModuleInit, OnModuleDestroy {
     }
 
     const now = new Date();
-    const brasiliaDate = new Date(now.getTime() - 3 * 3600 * 1000);
-    const todayStr = brasiliaDate.toISOString().slice(0, 10);
+    const { dateStr: todayStr } = this.getLocalDateParts(now, user.timezone || 'America/Sao_Paulo');
 
     const { message, eventsCount, tasksCount, shoppingCount } = await this.buildDailyBriefing(user, todayStr);
 
@@ -132,6 +194,14 @@ export class DailyBriefingService implements OnModuleInit, OnModuleDestroy {
         whatsappStatus = `Tentativa de envio ao WhatsApp falhou: ${err.message}`;
       }
     }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        lastDailySummaryDate: todayStr,
+        lastDailySentAt: now,
+      },
+    });
 
     return {
       success: true,
@@ -216,7 +286,6 @@ export class DailyBriefingService implements OnModuleInit, OnModuleDestroy {
       },
     });
 
-    // Montar texto
     const firstName = user.name ? user.name.split(' ')[0] : 'aí';
 
     let eventsBlock = '• _Nenhum compromisso agendado para hoje. Aproveite o dia livre!_';
@@ -226,7 +295,7 @@ export class DailyBriefingService implements OnModuleInit, OnModuleDestroy {
           const time = ev.isAllDay
             ? 'Dia inteiro'
             : ev.startDate.toLocaleTimeString('pt-BR', {
-                timeZone: 'America/Sao_Paulo',
+                timeZone: user.timezone || 'America/Sao_Paulo',
                 hour: '2-digit',
                 minute: '2-digit',
               });
@@ -242,7 +311,7 @@ export class DailyBriefingService implements OnModuleInit, OnModuleDestroy {
       tasksBlock = tasks
         .map((tk: any) => {
           const dueTime = tk.hasSpecificTime && tk.dueDate
-            ? ` [às ${tk.dueDate.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })}]`
+            ? ` [às ${tk.dueDate.toLocaleTimeString('pt-BR', { timeZone: user.timezone || 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })}]`
             : '';
           const scope = tk.scope === RecordScope.SHARED ? ' 🏠' : '';
           return `• ${tk.title}${dueTime}${scope}`;
@@ -287,21 +356,31 @@ Tenha um dia muito produtivo e abençoado! ✨📱`;
 
   private async sendDailyBriefing(user: any, todayStr: string) {
     this.logger.log(`Enviando resumo matinal diário para ${user.name || user.email} (${user.phoneNumber})`);
-    const { message } = await this.buildDailyBriefing(user, todayStr);
-    await this.whatsappService.sendWhatsAppMessage(user.phoneNumber, message);
+    const { message, eventsCount, tasksCount } = await this.buildDailyBriefing(user, todayStr);
+    if (user.phoneNumber) {
+      await this.whatsappService.sendWhatsAppMessage(user.phoneNumber, message);
+    }
+    await this.notificationsService.dispatchNotification({
+      recipientId: user.id,
+      householdId: user.householdId,
+      type: NotificationType.SYSTEM,
+      title: '🌅 Seu Resumo Diário está pronto',
+      body: `Você tem ${eventsCount} compromisso(s) e ${tasksCount} lembrete(s) para hoje.`,
+      deepLink: '/(tabs)/calendar',
+    });
   }
 
   private async sendPeriodicBriefing(user: any, type: string) {
-    const label = type === 'biweekly' ? 'Quinzenal' : 'Semanal';
+    const isBiweekly = type === 'biweekly';
+    const label = isBiweekly ? 'Quinzenal' : 'Semanal';
+    const horizonDays = isBiweekly ? 14 : 7;
     this.logger.log(`Enviando resumo ${label} para ${user.name || user.email} (${user.phoneNumber})`);
 
     const now = new Date();
-    const brasiliaDate = new Date(now.getTime() - 3 * 3600 * 1000);
-    const startStr = brasiliaDate.toISOString().slice(0, 10);
+    const { dateStr: startStr } = this.getLocalDateParts(now, user.timezone || 'America/Sao_Paulo');
     const startOfPeriod = new Date(`${startStr}T00:00:00-03:00`);
-    const endOfPeriod = new Date(startOfPeriod.getTime() + 7 * 24 * 3600 * 1000);
+    const endOfPeriod = new Date(startOfPeriod.getTime() + horizonDays * 24 * 3600 * 1000);
 
-    // Eventos dos próximos 7 dias
     const events = await this.prisma.calendarEvent.findMany({
       where: {
         OR: [
@@ -315,7 +394,6 @@ Tenha um dia muito produtivo e abençoado! ✨📱`;
       orderBy: { startDate: 'asc' },
     });
 
-    // Tarefas dos próximos 7 dias
     const tasks = await this.prisma.task.findMany({
       where: {
         OR: [
@@ -337,7 +415,7 @@ Tenha um dia muito produtivo e abençoado! ✨📱`;
       eventsBlock = events
         .map((ev: any) => {
           const dateStr = ev.startDate.toLocaleDateString('pt-BR', {
-            timeZone: 'America/Sao_Paulo',
+            timeZone: user.timezone || 'America/Sao_Paulo',
             weekday: 'short',
             day: '2-digit',
             month: '2-digit',
@@ -345,7 +423,7 @@ Tenha um dia muito produtivo e abençoado! ✨📱`;
           const time = ev.isAllDay
             ? 'Dia todo'
             : ev.startDate.toLocaleTimeString('pt-BR', {
-                timeZone: 'America/Sao_Paulo',
+                timeZone: user.timezone || 'America/Sao_Paulo',
                 hour: '2-digit',
                 minute: '2-digit',
               });
@@ -354,13 +432,13 @@ Tenha um dia muito produtivo e abençoado! ✨📱`;
         .join('\n');
     }
 
-    let tasksBlock = '• _Nenhuma tarefa pendente com prazo nesta semana._';
+    let tasksBlock = '• _Nenhuma tarefa pendente com prazo neste período._';
     if (tasks.length > 0) {
       tasksBlock = tasks
         .map((tk: any) => {
           const dateStr = tk.dueDate
             ? tk.dueDate.toLocaleDateString('pt-BR', {
-                timeZone: 'America/Sao_Paulo',
+                timeZone: user.timezone || 'America/Sao_Paulo',
                 weekday: 'short',
                 day: '2-digit',
               })
@@ -372,16 +450,27 @@ Tenha um dia muito produtivo e abençoado! ✨📱`;
 
     const message = `🗓️ *Seu Resumo ${label} Harry!*
 
-Olá, ${firstName}! Aqui está o panorama da sua semana:
+Olá, ${firstName}! Aqui está o panorama dos próximos ${horizonDays} dias:
 
-📅 *Eventos & Compromissos da Semana:*
+📅 *Eventos & Compromissos:*
 ${eventsBlock}
 
-📌 *Tarefas & Prazos da Semana:*
+📌 *Tarefas & Prazos:*
 ${tasksBlock}
 
-Planeje sua semana com tranquilidade no app Harry! 🚀`;
+Planeje sua rotina com tranquilidade no app Harry! 🚀`;
 
-    await this.whatsappService.sendWhatsAppMessage(user.phoneNumber, message);
+    if (user.phoneNumber) {
+      await this.whatsappService.sendWhatsAppMessage(user.phoneNumber, message);
+    }
+
+    await this.notificationsService.dispatchNotification({
+      recipientId: user.id,
+      householdId: user.householdId,
+      type: NotificationType.SYSTEM,
+      title: `🗓️ Resumo ${label} Disponível`,
+      body: `Confira seus ${events.length} compromisso(s) e ${tasks.length} tarefa(s) dos próximos ${horizonDays} dias.`,
+      deepLink: '/(tabs)/calendar',
+    });
   }
 }

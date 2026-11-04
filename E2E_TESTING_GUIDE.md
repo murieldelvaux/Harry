@@ -6,7 +6,7 @@ Este repositório conta com uma suíte completa de **Testes de Regressão End-to
 
 ## 📌 1. Cobertura da Suíte de Regressão
 
-A suíte cobre 100% dos fluxos funcionais da aplicação Harry / Nexo, distribuídos em 9 arquivos com **41 cenários de teste automatizados**:
+A suíte cobre 100% dos fluxos funcionais da aplicação Harry / Nexo, distribuídos em 10 arquivos com **48 cenários de teste automatizados**:
 
 | Arquivo de Teste | Módulo / Funcionalidade | Cenários Cobertos |
 | :--- | :--- | :--- |
@@ -18,7 +18,8 @@ A suíte cobre 100% dos fluxos funcionais da aplicação Harry / Nexo, distribu�
 | [`e2e/shopping-list.spec.ts`](file:///Users/murieldaher/Desktop/mestrado/nexo/e2e/shopping-list.spec.ts) | Lista de Compras | Listagem de itens pendentes e no carrinho, adição rápida via campo de texto, filtro por escopo (Compartilhado / Meus), alternância de status comprado, exclusão de item. |
 | [`e2e/calendar.spec.ts`](file:///Users/murieldaher/Desktop/mestrado/nexo/e2e/calendar.spec.ts) | Agenda & Calendário | Renderização do calendário mensal, dias da semana e status Google Agenda, navegação entre meses e botão Hoje, cadastro de novo compromisso via modal, remoção de evento. |
 | [`e2e/settings.spec.ts`](file:///Users/murieldaher/Desktop/mestrado/nexo/e2e/settings.spec.ts) | Perfil & Configurações | Dados do usuário logado, integração e salvamento do número de WhatsApp para assistente Harry, preferências de notificações matinais (06:00), alternância de tema Claro vs. Escuro. |
-| [`e2e/navigation.spec.ts`](file:///Users/murieldaher/Desktop/mestrado/nexo/e2e/navigation.spec.ts) | Navegação Global & Drawer | Abertura do menu hambúrguer (☰), exibição de todas as 8 opções do drawer, navegação encadeada entre telas, fechamento pelo botão (✕), logout com confirmação e redirecionamento ao login. |
+| [`e2e/navigation.spec.ts`](file:///Users/murieldaher/Desktop/mestrado/nexo/e2e/navigation.spec.ts) | Navegação Global & Drawer | Abertura do menu hambúrguer (☰), exibição de todas as opções do drawer, navegação encadeada entre telas, fechamento pelo botão (✕), logout com confirmação e redirecionamento ao login. |
+| [`e2e/couple-features-v2.spec.ts`](file:///Users/murieldaher/Desktop/mestrado/nexo/e2e/couple-features-v2.spec.ts) | Backlog Casal v2 (Tasks 1 a 11) | Refresh Token (`harry_refresh_token`), Central de Notificações In-App (`notification-bell`), seleção de pagador (`PartnerSelect`), fechamento de contas e liquidação 50/50 (`Settlement`), dashboard analítico de gastos, agendamento flexível diário/quinzenal, `CalendarDatePicker`, ranking de itens mais comprados com reposição em 1 toque e módulo de treinos Strava + MFIT + incentivo. |
 
 ---
 

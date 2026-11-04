@@ -13,6 +13,7 @@ import {
   Linking,
 } from 'react-native';
 import { AppHeader } from '../../src/components/AppHeader';
+import { CalendarDatePicker } from '../../src/components/CalendarDatePicker';
 import { useTheme } from '../../src/theme/ThemeContext';
 import { useCalendar } from '../../src/hooks/useCalendar';
 import { useGoogleCalendarAuth } from '../../src/hooks/useGoogleCalendarAuth';
@@ -1148,93 +1149,31 @@ export default function CalendarScreen() {
               {/* DATAS DE INÍCIO E TÉRMINO */}
               <View style={[styles.timeRow, { gap: 12 }]}>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                    Data de Início
-                  </Text>
-                  {Platform.OS === 'web' ? (
-                    <input
-                      type="date"
-                      value={newStartDateStr}
-                      onChange={(e: any) => {
-                        const val = e.target.value;
-                        setNewStartDateStr(val);
-                        if (!newIsMultiDay || newEndDateStr < val) {
-                          setNewEndDateStr(val);
-                        }
-                      }}
-                      style={{
-                        backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
-                        color: isDark ? '#F1F5F9' : '#0F172A',
-                        colorScheme: isDark ? 'dark' : 'light',
-                        border: `1px solid ${theme.border}`,
-                        borderRadius: 12,
-                        padding: '10px 12px',
-                        fontSize: 14,
-                        fontFamily: 'inherit',
-                        outline: 'none',
-                        width: '100%',
-                        height: 44,
-                        minWidth: 0,
-                        maxWidth: '100%',
-                        boxSizing: 'border-box',
-                        display: 'block',
-                        appearance: 'none',
-                        WebkitAppearance: 'none',
-                        textAlign: 'left',
-                      }}
-                    />
-                  ) : (
-                    <TextInput
-                      style={[styles.input, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary }]}
-                      value={newStartDateStr}
-                      onChangeText={setNewStartDateStr}
-                      placeholder="AAAA-MM-DD"
-                      placeholderTextColor={theme.textMuted}
-                    />
-                  )}
+                  <CalendarDatePicker
+                    testID="event-create-start-date-picker"
+                    label="Data de Início"
+                    value={newStartDateStr}
+                    outputFormat="YMD"
+                    allowClear={false}
+                    onChange={(val) => {
+                      setNewStartDateStr(val);
+                      if (!newIsMultiDay || newEndDateStr < val) {
+                        setNewEndDateStr(val);
+                      }
+                    }}
+                  />
                 </View>
 
                 {newIsMultiDay && (
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                      Data de Término
-                    </Text>
-                    {Platform.OS === 'web' ? (
-                      <input
-                        type="date"
-                        value={newEndDateStr}
-                        min={newStartDateStr}
-                        onChange={(e: any) => setNewEndDateStr(e.target.value)}
-                        style={{
-                          backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
-                          color: isDark ? '#F1F5F9' : '#0F172A',
-                          colorScheme: isDark ? 'dark' : 'light',
-                          border: `1px solid ${theme.border}`,
-                          borderRadius: 12,
-                          padding: '10px 12px',
-                          fontSize: 14,
-                          fontFamily: 'inherit',
-                          outline: 'none',
-                          width: '100%',
-                          height: 44,
-                          minWidth: 0,
-                          maxWidth: '100%',
-                          boxSizing: 'border-box',
-                          display: 'block',
-                          appearance: 'none',
-                          WebkitAppearance: 'none',
-                          textAlign: 'left',
-                        }}
-                      />
-                    ) : (
-                      <TextInput
-                        style={[styles.input, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary }]}
-                        value={newEndDateStr}
-                        onChangeText={setNewEndDateStr}
-                        placeholder="AAAA-MM-DD"
-                        placeholderTextColor={theme.textMuted}
-                      />
-                    )}
+                    <CalendarDatePicker
+                      testID="event-create-end-date-picker"
+                      label="Data de Término"
+                      value={newEndDateStr}
+                      outputFormat="YMD"
+                      allowClear={false}
+                      onChange={setNewEndDateStr}
+                    />
                   </View>
                 )}
               </View>
@@ -1567,93 +1506,31 @@ export default function CalendarScreen() {
               {/* DATAS DE INÍCIO E TÉRMINO */}
               <View style={[styles.timeRow, { gap: 12 }]}>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                    Data de Início
-                  </Text>
-                  {Platform.OS === 'web' ? (
-                    <input
-                      type="date"
-                      value={editStartDateStr}
-                      onChange={(e: any) => {
-                        const val = e.target.value;
-                        setEditStartDateStr(val);
-                        if (!editIsMultiDay || editEndDateStr < val) {
-                          setEditEndDateStr(val);
-                        }
-                      }}
-                      style={{
-                        backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
-                        color: isDark ? '#F1F5F9' : '#0F172A',
-                        colorScheme: isDark ? 'dark' : 'light',
-                        border: `1px solid ${theme.border}`,
-                        borderRadius: 12,
-                        padding: '10px 12px',
-                        fontSize: 14,
-                        fontFamily: 'inherit',
-                        outline: 'none',
-                        width: '100%',
-                        height: 44,
-                        minWidth: 0,
-                        maxWidth: '100%',
-                        boxSizing: 'border-box',
-                        display: 'block',
-                        appearance: 'none',
-                        WebkitAppearance: 'none',
-                        textAlign: 'left',
-                      }}
-                    />
-                  ) : (
-                    <TextInput
-                      style={[styles.input, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary }]}
-                      value={editStartDateStr}
-                      onChangeText={setEditStartDateStr}
-                      placeholder="AAAA-MM-DD"
-                      placeholderTextColor={theme.textMuted}
-                    />
-                  )}
+                  <CalendarDatePicker
+                    testID="event-edit-start-date-picker"
+                    label="Data de Início"
+                    value={editStartDateStr}
+                    outputFormat="YMD"
+                    allowClear={false}
+                    onChange={(val) => {
+                      setEditStartDateStr(val);
+                      if (!editIsMultiDay || editEndDateStr < val) {
+                        setEditEndDateStr(val);
+                      }
+                    }}
+                  />
                 </View>
 
                 {editIsMultiDay && (
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                      Data de Término
-                    </Text>
-                    {Platform.OS === 'web' ? (
-                      <input
-                        type="date"
-                        value={editEndDateStr}
-                        min={editStartDateStr}
-                        onChange={(e: any) => setEditEndDateStr(e.target.value)}
-                        style={{
-                          backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
-                          color: isDark ? '#F1F5F9' : '#0F172A',
-                          colorScheme: isDark ? 'dark' : 'light',
-                          border: `1px solid ${theme.border}`,
-                          borderRadius: 12,
-                          padding: '10px 12px',
-                          fontSize: 14,
-                          fontFamily: 'inherit',
-                          outline: 'none',
-                          width: '100%',
-                          height: 44,
-                          minWidth: 0,
-                          maxWidth: '100%',
-                          boxSizing: 'border-box',
-                          display: 'block',
-                          appearance: 'none',
-                          WebkitAppearance: 'none',
-                          textAlign: 'left',
-                        }}
-                      />
-                    ) : (
-                      <TextInput
-                        style={[styles.input, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary }]}
-                        value={editEndDateStr}
-                        onChangeText={setEditEndDateStr}
-                        placeholder="AAAA-MM-DD"
-                        placeholderTextColor={theme.textMuted}
-                      />
-                    )}
+                    <CalendarDatePicker
+                      testID="event-edit-end-date-picker"
+                      label="Data de Término"
+                      value={editEndDateStr}
+                      outputFormat="YMD"
+                      allowClear={false}
+                      onChange={setEditEndDateStr}
+                    />
                   </View>
                 )}
               </View>
