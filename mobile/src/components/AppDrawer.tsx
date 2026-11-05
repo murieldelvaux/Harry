@@ -80,7 +80,7 @@ const NAV_ITEMS: NavItem[] = [
   {
     id: 'workouts',
     title: 'Treinos & Fitness',
-    subtitle: 'Corrida (Strava) e Musculação (MFIT)',
+    subtitle: 'Corrida e Musculação',
     route: '/(tabs)/workouts',
     icon: '🏋️',
   },

@@ -11,9 +11,11 @@ export interface PartnerWeeklyStatsDto {
   userId: string;
   userName: string;
   workoutCount: number;
+  plannedWorkoutsCount?: number;
   runningWorkouts: number;
   strengthWorkouts: number;
   totalRunningKm: number;
+  plannedRunningKm?: number;
   totalDurationMinutes: number;
   totalStrengthVolumeKg: number;
   totalStrengthSets: number;
@@ -73,10 +75,59 @@ export const workoutsService = {
     return data;
   },
 
+  async syncAll(payload?: { calendarUrl?: string }): Promise<{
+    success: boolean;
+    syncedCount: number;
+    message: string;
+    dashboard: CoupleWorkoutDashboardDto;
+  }> {
+    const { data } = await apiClient.post('/workouts/integrations/sync-all', payload || {});
+    return data;
+  },
+
+  async syncGarminCalendar(payload: {
+    calendarUrl?: string;
+    icsContent?: string;
+  }): Promise<{
+    syncedCount: number;
+    provider: FitnessProvider;
+    workouts: WorkoutActivityDto[];
+    message: string;
+  }> {
+    const { data } = await apiClient.post(
+      '/workouts/integrations/garmin/calendar',
+      payload,
+    );
+    return data;
+  },
+
+  async syncGarminCalendarViaApi(payload: {
+    email?: string;
+    password?: string;
+    year?: number;
+    month?: number;
+  }): Promise<{
+    syncedCount: number;
+    provider: FitnessProvider;
+    workouts: WorkoutActivityDto[];
+    message: string;
+  }> {
+    const { data } = await apiClient.post(
+      '/workouts/integrations/garmin/calendar-api',
+      payload,
+    );
+    return data;
+  },
+
   async disconnectProvider(provider: FitnessProvider): Promise<{ success: boolean }> {
     const { data } = await apiClient.delete<{ success: boolean }>(
       `/workouts/integrations/${provider}`,
     );
+    return data;
+  },
+
+  async completeWorkout(id: string): Promise<WorkoutActivityDto> {
+    const { data } = await apiClient.post<WorkoutActivityDto>(`/workouts/${id}/complete`);
     return data;
   },
 

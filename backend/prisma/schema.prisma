@@ -63,9 +63,15 @@ enum WorkoutModality {
   OTHER
 }
 
+enum WorkoutStatus {
+  COMPLETED
+  PLANNED
+}
+
 enum FitnessProvider {
   MANUAL
   STRAVA
+  GARMIN
   MFIT
 }
 
@@ -343,6 +349,8 @@ model CalendarEvent {
   householdId      String?
   household        Household?  @relation(fields: [householdId], references: [id], onDelete: Cascade)
 
+  workoutActivities WorkoutActivity[]
+
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
@@ -379,6 +387,7 @@ model WorkoutActivity {
   householdId      String?
   household        Household?      @relation(fields: [householdId], references: [id], onDelete: Cascade)
   modality         WorkoutModality
+  status           WorkoutStatus   @default(COMPLETED)
   provider         FitnessProvider @default(MANUAL)
   externalId       String?
   title            String
@@ -393,12 +402,16 @@ model WorkoutActivity {
   setsCount        Int?
   exercisesJson    Json?
   scope            RecordScope     @default(SHARED)
+  calendarEventId  String?
+  calendarEvent    CalendarEvent?  @relation(fields: [calendarEventId], references: [id], onDelete: SetNull)
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
   @@unique([provider, externalId])
   @@index([householdId, startedAt])
   @@index([userId, startedAt])
+  @@index([status, startedAt])
+  @@index([calendarEventId])
 }
 
 model FitnessIntegration {
@@ -409,6 +422,7 @@ model FitnessIntegration {
   accessToken  String?
   refreshToken String?
   apiKey       String?
+  calendarUrl  String?
   athleteId    String?
   isActive     Boolean         @default(true)
   lastSyncedAt DateTime?

@@ -40,6 +40,39 @@ export function useWorkouts() {
     },
   });
 
+  const syncGarminCalendarMutation = useMutation({
+    mutationFn: (payload: { calendarUrl?: string; icsContent?: string }) =>
+      workoutsService.syncGarminCalendar(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.workouts.all });
+    },
+  });
+
+  const syncAllMutation = useMutation({
+    mutationFn: (payload?: { calendarUrl?: string }) =>
+      workoutsService.syncAll(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.workouts.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all });
+    },
+  });
+
+  const syncGarminCalendarViaApiMutation = useMutation({
+    mutationFn: (payload: { email?: string; password?: string; year?: number; month?: number }) =>
+      workoutsService.syncGarminCalendarViaApi(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.workouts.all });
+    },
+  });
+
+  const completeWorkoutMutation = useMutation({
+    mutationFn: (id: string) => workoutsService.completeWorkout(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.workouts.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
+    },
+  });
+
   const cheerWorkoutMutation = useMutation({
     mutationFn: ({ id, message }: { id: string; message?: string }) =>
       workoutsService.cheerWorkout(id, message),
@@ -80,6 +113,14 @@ export function useWorkouts() {
     getStravaAuthUrl: workoutsService.getStravaAuthUrl,
     syncProvider: syncProviderMutation.mutateAsync,
     isSyncing: syncProviderMutation.isPending,
+    syncAll: syncAllMutation.mutateAsync,
+    isSyncingAll: syncAllMutation.isPending,
+    syncGarminCalendar: syncGarminCalendarMutation.mutateAsync,
+    isSyncingGarminCalendar: syncGarminCalendarMutation.isPending,
+    syncGarminCalendarViaApi: syncGarminCalendarViaApiMutation.mutateAsync,
+    isSyncingGarminCalendarViaApi: syncGarminCalendarViaApiMutation.isPending,
+    completeWorkout: completeWorkoutMutation.mutateAsync,
+    isCompleting: completeWorkoutMutation.isPending,
     cheerWorkout: cheerWorkoutMutation.mutateAsync,
     isCheering: cheerWorkoutMutation.isPending,
     deleteWorkout: deleteWorkoutMutation.mutateAsync,

@@ -10,6 +10,7 @@ import {
   SettlementStatus,
   WorkoutModality,
   FitnessProvider,
+  WorkoutStatus,
 } from './enums';
 
 // -----------------------------------------------------------------------------
@@ -479,9 +480,32 @@ export interface StrengthExerciseDto {
   weightKg: number;
 }
 
+export interface RunningWorkoutStepDto {
+  phase: 'WARMUP' | 'MAIN' | 'INTERVAL' | 'RECOVERY' | 'COOLDOWN';
+  phaseLabel: string;
+  durationOrDistance: string;
+  targetPace?: string;
+  targetHeartRateZone?: string;
+  notes?: string;
+}
+
+export interface RunningSplitDto {
+  km: number;
+  pace: string;
+  heartRate?: number;
+  elevationM?: number;
+}
+
 export const CreateWorkoutDtoSchema = z.object({
   modality: z.nativeEnum(WorkoutModality),
   provider: z.nativeEnum(FitnessProvider).default(FitnessProvider.MANUAL),
+  status: z.nativeEnum(WorkoutStatus).optional(),
+  workoutType: z.string().optional(),
+  targetPace: z.string().optional(),
+  targetHrZone: z.string().optional(),
+  averageHeartRate: z.number().optional(),
+  maxHeartRate: z.number().optional(),
+  cadenceSpm: z.number().optional(),
   externalId: z.string().optional(),
   title: z.string().min(1, 'Título do treino obrigatório'),
   notes: z.string().optional(),
@@ -501,6 +525,24 @@ export const CreateWorkoutDtoSchema = z.object({
       weightKg: z.number(),
     }),
   ).optional(),
+  runningSteps: z.array(
+    z.object({
+      phase: z.enum(['WARMUP', 'MAIN', 'INTERVAL', 'RECOVERY', 'COOLDOWN']),
+      phaseLabel: z.string(),
+      durationOrDistance: z.string(),
+      targetPace: z.string().optional(),
+      targetHeartRateZone: z.string().optional(),
+      notes: z.string().optional(),
+    }),
+  ).optional(),
+  splits: z.array(
+    z.object({
+      km: z.number(),
+      pace: z.string(),
+      heartRate: z.number().optional(),
+      elevationM: z.number().optional(),
+    }),
+  ).optional(),
   scope: z.nativeEnum(RecordScope).default(RecordScope.SHARED),
 });
 export type CreateWorkoutDto = z.infer<typeof CreateWorkoutDtoSchema>;
@@ -515,9 +557,8 @@ export interface ConnectFitnessProviderDto {
   accessToken?: string;
   refreshToken?: string;
   athleteId?: string;
-  mfitEmail?: string;
-  mfitPassword?: string;
-  mfitSheetUrl?: string;
+  garminCalendarUrl?: string;
+  garminEmail?: string;
 }
 
 export interface WorkoutActivityDto {
@@ -531,6 +572,13 @@ export interface WorkoutActivityDto {
   householdId: string | null;
   modality: WorkoutModality;
   provider: FitnessProvider;
+  status: WorkoutStatus;
+  workoutType?: string | null;
+  targetPace?: string | null;
+  targetHrZone?: string | null;
+  averageHeartRate?: number | null;
+  maxHeartRate?: number | null;
+  cadenceSpm?: number | null;
   externalId?: string | null;
   title: string;
   notes?: string | null;
@@ -543,6 +591,8 @@ export interface WorkoutActivityDto {
   totalVolumeKg?: number | null;
   setsCount?: number | null;
   exercisesJson?: StrengthExerciseDto[] | null;
+  runningSteps?: RunningWorkoutStepDto[] | null;
+  splits?: RunningSplitDto[] | null;
   scope: RecordScope;
   createdAt: string;
 }
@@ -551,6 +601,7 @@ export interface FitnessIntegrationDto {
   id: string;
   provider: FitnessProvider;
   athleteId?: string | null;
+  calendarUrl?: string | null;
   isActive: boolean;
   lastSyncedAt?: string | null;
 }

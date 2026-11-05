@@ -18,10 +18,12 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-  CREATE TYPE "FitnessProvider" AS ENUM ('MANUAL', 'STRAVA', 'MFIT');
+  CREATE TYPE "FitnessProvider" AS ENUM ('MANUAL', 'STRAVA', 'GARMIN', 'MFIT');
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
+
+ALTER TYPE "FitnessProvider" ADD VALUE IF NOT EXISTS 'GARMIN';
 
 -- AlterTable User
 ALTER TABLE "User"

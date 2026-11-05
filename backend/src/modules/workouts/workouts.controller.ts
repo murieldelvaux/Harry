@@ -83,12 +83,36 @@ export class WorkoutsController {
     return this.workoutsService.handleStravaWebhookEvent(payload);
   }
 
+  @Post('integrations/garmin/calendar')
+  async syncGarminCalendar(
+    @CurrentUser('userId') userId: string,
+    @Body() body: { calendarUrl?: string; icsContent?: string },
+  ) {
+    return this.workoutsService.syncGarminCalendar(userId, body);
+  }
+
+  @Post('integrations/garmin/calendar-api')
+  async syncGarminCalendarViaApi(
+    @CurrentUser('userId') userId: string,
+    @Body() body: { email?: string; password?: string; year?: number; month?: number },
+  ) {
+    return this.workoutsService.syncGarminCalendarViaApi(userId, body);
+  }
+
   @Post('integrations/connect')
   async connectProvider(
     @CurrentUser('userId') userId: string,
     @Body() dto: ConnectFitnessProviderDto,
   ) {
     return this.workoutsService.connectProvider(userId, dto);
+  }
+
+  @Post('integrations/sync-all')
+  async syncAll(
+    @CurrentUser('userId') userId: string,
+    @Body() body: { calendarUrl?: string },
+  ) {
+    return this.workoutsService.syncAll(userId, body);
   }
 
   @Post('integrations/sync')
@@ -108,6 +132,14 @@ export class WorkoutsController {
     @Param('provider') provider: FitnessProvider,
   ) {
     return this.workoutsService.disconnectProvider(userId, provider);
+  }
+
+  @Post(':id/complete')
+  async completePlannedWorkout(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.workoutsService.completePlannedWorkout(userId, id);
   }
 
   @Post(':id/cheer')

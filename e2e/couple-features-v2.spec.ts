@@ -102,27 +102,25 @@ test.describe('Backlog Casal v2 — Notificações, Fechamento 50/50, Compras & 
     await page.getByTestId('readd-shopping-item-cafe-em-grao').click();
   });
 
-  test('Task 11: deve exibir módulo de treinos do casal (Strava OAuth2/API v3 + MFIT Personal Fichas), conectar e incentivar parceiro', async ({ page }) => {
+  test('Task 11: deve exibir calendário mensal/semanal de treinos, corridas planejadas e concluídas do Garmin e OAuth2 do Strava', async ({ page }) => {
     await page.goto('/workouts');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText(/Constância Semanal do Casal/i).first()).toBeVisible();
-    await expect(page.getByText(/Strava \(Corrida\)/i).first()).toBeVisible();
-    await expect(page.getByText(/MFIT Personal \(Musculação\)/i).first()).toBeVisible();
+    await expect(page.getByTestId('workout-calendar-card')).toBeVisible();
+    await expect(page.getByTestId('weekly-calendar-strip')).toBeVisible();
+    await expect(page.getByText(/Garmin Connect \(Corridas da Semana\)/i).first()).toBeVisible();
+    await expect(page.getByText(/Strava \(Corrida & Musculação\)/i).first()).toBeVisible();
+    await expect(page.getByTestId('connect-strava-oauth-btn')).toBeVisible();
 
-    // Abre modal de configuração Strava (OAuth2 + API v3)
-    await page.getByTestId('open-strava-config-btn').click();
-    await expect(page.getByTestId('strava-config-modal')).toBeVisible();
-    await expect(page.getByTestId('strava-oauth-redirect-btn')).toBeVisible();
-    await page.getByTestId('strava-connect-sandbox-btn').click();
+    // Verifica corrida planejada da semana com detalhes estruturados (etapas)
+    await expect(page.getByText(/Tiros de Velocidade 5x 800m VO2Max/i).first()).toBeVisible();
+    await expect(page.getByText(/Bloco Principal — 5x 800m Forte/i).first()).toBeVisible();
 
-    // Abre modal de configuração MFIT Personal (Aluno & Fichas A/B/C)
-    await page.getByTestId('open-mfit-config-btn').click();
-    await expect(page.getByTestId('mfit-config-modal')).toBeVisible();
-    await page.getByTestId('select-mfit-sheet-B').click();
-    await page.getByTestId('mfit-log-sheet-btn').click();
+    // Simula retorno do callback OAuth2 do Strava (?code=dev_oauth_code)
+    await page.goto('/workouts?code=dev_oauth_code');
+    await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText(/Treino B — Inferiores Completo/i).first()).toBeVisible();
+    await expect(page.getByTestId('sync-strava-btn')).toBeVisible();
 
     // Envia incentivo ao parceiro
     await page.getByTestId('cheer-workout-btn').first().click();

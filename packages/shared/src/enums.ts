@@ -76,5 +76,11 @@ export enum WorkoutModality {
 export enum FitnessProvider {
   MANUAL = 'MANUAL',
   STRAVA = 'STRAVA',
+  GARMIN = 'GARMIN',
   MFIT = 'MFIT',
+}
+
+export enum WorkoutStatus {
+  COMPLETED = 'COMPLETED',
+  PLANNED = 'PLANNED',
 }
