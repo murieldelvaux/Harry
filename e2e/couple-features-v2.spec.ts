@@ -53,7 +53,7 @@ test.describe('Backlog Casal v2 — Notificações, Fechamento 50/50, Compras & 
     // Navega para a aba Fechar Contas
     await page.getByTestId('expenses-tab-closing').click();
     await expect(page.getByText(/Encontro de Contas do Período/i).first()).toBeVisible();
-    await expect(page.getByTestId('settlement-transfer-card')).toContainText(/Lucas deve transferir R\$ 150,00 para Muriel/i);
+    await expect(page.getByTestId('settlement-transfer-card')).toContainText(/Lucas deve transferir R\$[\s\u00A0]*150,00 para Muriel/i);
 
     // Registra o fechamento (Task 4)
     await page.getByTestId('close-accounts-btn').click();
@@ -112,9 +112,10 @@ test.describe('Backlog Casal v2 — Notificações, Fechamento 50/50, Compras & 
     await expect(page.getByText(/Strava \(Corrida & Musculação\)/i).first()).toBeVisible();
     await expect(page.getByTestId('connect-strava-oauth-btn')).toBeVisible();
 
-    // Verifica corrida planejada da semana com detalhes estruturados (etapas)
+    // Verifica corrida planejada da semana com detalhes e descrição (Notes)
     await expect(page.getByText(/Tiros de Velocidade 5x 800m VO2Max/i).first()).toBeVisible();
-    await expect(page.getByText(/Bloco Principal — 5x 800m Forte/i).first()).toBeVisible();
+    await expect(page.getByText(/Descrição do Treino \(Notes\)/i).first()).toBeVisible();
+    await expect(page.getByText(/Planejado na planilha da semana/i).first()).toBeVisible();
 
     // Simula retorno do callback OAuth2 do Strava (?code=dev_oauth_code)
     await page.goto('/workouts?code=dev_oauth_code');

@@ -13,8 +13,8 @@ test.describe('Lista de Compras (Shopping List)', () => {
     await expect(page.getByPlaceholder(/Adicionar item/i)).toBeVisible();
 
     // Itens mockados
-    await expect(page.getByText('Café em grãos')).toBeVisible();
-    await expect(page.getByText('Azeite de oliva extra virgem')).toBeVisible();
+    await expect(page.getByText('Café em grãos').first()).toBeVisible();
+    await expect(page.getByText('Azeite de oliva extra virgem').first()).toBeVisible();
   });
 
   test('deve adicionar um novo item rapidamente pelo campo de texto', async ({ page }) => {
@@ -37,14 +37,14 @@ test.describe('Lista de Compras (Shopping List)', () => {
     await expect(filterMine).toBeVisible();
 
     await filterShared.click();
-    await expect(page.getByText('Café em grãos')).toBeVisible();
+    await expect(page.getByText('Café em grãos').first()).toBeVisible();
   });
 
   test('deve permitir marcar um item como comprado / no carrinho', async ({ page }) => {
-    await expect(page.getByText('Café em grãos')).toBeVisible();
+    await expect(page.getByText('Café em grãos').first()).toBeVisible();
 
     // Clica no checkbox do item pendente
-    const checkbox = page.locator("text=Café em grãos").locator('..').locator('..').locator("div[role='checkbox'], [cursor='pointer']").first();
+    const checkbox = page.locator("text=Café em grãos").last().locator('..').locator('..').locator("div[role='checkbox'], [cursor='pointer']").first();
     if (await checkbox.isVisible()) {
       await checkbox.click();
     }
