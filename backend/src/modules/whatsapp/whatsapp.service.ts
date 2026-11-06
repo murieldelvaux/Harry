@@ -195,6 +195,7 @@ export class WhatsappService {
             scope: isShared ? RecordScope.SHARED : RecordScope.PRIVATE,
             rawSource: mediaSourceLabel ? `whatsapp_${messageType}` : 'whatsapp_message',
             userId: user.id,
+            paidByUserId: user.id,
             householdId: isShared ? user.householdId : null,
           },
         });
@@ -287,9 +288,17 @@ export class WhatsappService {
           const cleanName = sanitizeShoppingItemName(it.name);
           if (!cleanName) continue;
           const formattedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+          const normalizedName = formattedName
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9\s]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
           await this.prisma.shoppingItem.create({
             data: {
               name: formattedName,
+              normalizedName: normalizedName || formattedName.toLowerCase(),
               quantity: it.quantity ? it.quantity.trim() : "1",
               category: it.category ? it.category.trim() : "Geral",
               scope: shoppingScope,

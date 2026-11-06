@@ -6,11 +6,14 @@ export interface RealtimeEvent {
   type:
     | 'EXPENSE_CREATED'
     | 'EXPENSE_UPDATED'
+    | 'SETTLEMENT_UPDATED'
     | 'TASK_UPDATED'
     | 'GOAL_UPDATED'
     | 'SHOPPING_UPDATED'
     | 'CALENDAR_UPDATED'
     | 'EVENT_CREATED'
+    | 'NOTIFICATION_CREATED'
+    | 'WORKOUT_UPDATED'
     | 'REFETCH';
   householdId?: string | null;
   userId?: string | null;

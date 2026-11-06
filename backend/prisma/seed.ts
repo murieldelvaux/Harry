@@ -17,7 +17,7 @@ async function main() {
   // 1. Criar Household do casal
   const household = await prisma.household.create({
     data: {
-      name: 'Nossa Casa',
+      name: 'Sr. Hero e Sra. Codec',
       inviteCode: 'NEXO-2026',
     },
   });
@@ -27,8 +27,8 @@ async function main() {
   // 2. Criar Usuário A (Muriel)
   const userA = await prisma.user.create({
     data: {
-      email: 'muriel@harry.app',
-      name: 'Muriel',
+      email: 'muridelvaux@gmail.com',
+      name: 'Muriel Delvaux',
       passwordHash,
       phoneNumber: '+5511988881111',
       householdId: household.id,
@@ -56,8 +56,9 @@ async function main() {
         scope: RecordScope.SHARED,
         rawSource: 'whatsapp_message',
         userId: userA.id,
+        paidByUserId: userA.id,
         householdId: household.id,
-        date: new Date(),
+        date: new Date('2026-11-04T12:00:00.000Z'),
       },
       {
         description: 'Internet Fibra 600MB',
@@ -66,17 +67,9 @@ async function main() {
         scope: RecordScope.SHARED,
         rawSource: 'manual_app',
         userId: userB.id,
+        paidByUserId: userB.id,
         householdId: household.id,
-        date: new Date(),
-      },
-      {
-        description: 'Almoço Executivo',
-        amount: 38.50,
-        category: ExpenseCategory.RESTAURANT,
-        scope: RecordScope.PRIVATE,
-        rawSource: 'whatsapp_message',
-        userId: userA.id,
-        date: new Date(),
+        date: new Date('2026-11-04T12:00:00.000Z'),
       },
       {
         description: 'Assinatura Spotify',
@@ -85,7 +78,8 @@ async function main() {
         scope: RecordScope.PRIVATE,
         rawSource: 'manual_app',
         userId: userB.id,
-        date: new Date(),
+        paidByUserId: userB.id,
+        date: new Date('2026-11-04T12:00:00.000Z'),
       },
     ],
   });

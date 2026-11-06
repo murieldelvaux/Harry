@@ -28,9 +28,9 @@ test.describe('Configurações & Perfil (Settings)', () => {
 
   test('deve exibir opções de Notificações e Horário Matinal', async ({ page }) => {
     await expect(page.getByText(/Notificações & Resumo Diário/i)).toBeVisible();
-    await expect(page.getByText(/Horário do envio matinal/i)).toBeVisible();
-    await expect(page.getByPlaceholder('06:00')).toBeVisible();
-    await expect(page.getByText(/Salvar Preferências de Notificação/i)).toBeVisible();
+    await expect(page.getByText(/Horário exato do envio diário/i)).toBeVisible();
+    await expect(page.getByPlaceholder('07:30')).toBeVisible();
+    await expect(page.getByTestId('save-notification-settings-btn')).toBeVisible();
   });
 
   test('deve alternar a aparência entre Modo Claro e Modo Escuro', async ({ page }) => {

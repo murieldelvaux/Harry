@@ -16,12 +16,15 @@ import { ScopeBadge } from '../../src/components/ScopeBadge';
 import { LoadingState } from '../../src/components/LoadingState';
 import { EmptyState } from '../../src/components/EmptyState';
 import { CalendarRangePickerModal } from '../../src/components/CalendarRangePickerModal';
+import { CalendarDatePicker } from '../../src/components/CalendarDatePicker';
+import { PartnerSelect } from '../../src/components/PartnerSelect';
 import { useTheme } from '../../src/theme/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
-import { useExpenses } from '../../src/hooks/useExpenses';
+import { useExpenses, useExpenseSettlements, useExpenseAnalytics } from '../../src/hooks/useExpenses';
+import { useHousehold } from '../../src/hooks/useHousehold';
 import { useAuth } from '../../src/hooks/useAuth';
 import { formatCurrency, formatDate, getCategoryLabel, maskCurrency, unmaskCurrency, maskDate } from '../../src/utils/format';
-import { ExpenseCategory, RecordScope, TransactionType, ExpenseDto } from '../../../packages/shared/src';
+import { ExpenseCategory, RecordScope, TransactionType, ExpenseDto, SettlementStatus } from '../../../packages/shared/src';
 
 const MONTH_NAMES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -51,10 +54,12 @@ const EXPENSE_CATEGORIES: ExpenseCategory[] = [
 export default function ExpensesScreen() {
   const { theme, isDark } = useTheme();
   const { user } = useAuth();
+  const { household } = useHousehold();
   const today = new Date();
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1); // 1-12
   const [filterMode, setFilterMode] = useState<'MONTH' | 'PERIOD'>('MONTH');
+  const [activeTab, setActiveTab] = useState<'EXTRATO' | 'CLOSING' | 'ANALYTICS'>('EXTRATO');
 
   // Custom period states (DD/MM/AAAA)
   const [periodStartDate, setPeriodStartDate] = useState('');
@@ -76,11 +81,17 @@ export default function ExpensesScreen() {
   const [amount, setAmount] = useState('');
   const [transactionType, setTransactionType] = useState<TransactionType>(TransactionType.EXPENSE);
   const [category, setCategory] = useState<ExpenseCategory>(ExpenseCategory.FOOD_MARKET);
-  const [scope, setScope] = useState<RecordScope>(RecordScope.PRIVATE);
+  const [scope, setScope] = useState<RecordScope>(RecordScope.SHARED);
+  const [paidByUserId, setPaidByUserId] = useState<string>(user?.id || '');
   const [customDate, setCustomDate] = useState('');
+  const [closingNotes, setClosingNotes] = useState('');
 
   // Format month string "YYYY-MM"
   const currentMonthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+
+  const periodQuery = filterMode === 'MONTH'
+    ? { month: currentMonthStr }
+    : { startDate: appliedPeriod.start, endDate: appliedPeriod.end };
 
   const {
     expenses: rawExpenses,
@@ -93,14 +104,45 @@ export default function ExpensesScreen() {
     deleteExpense,
     refetch,
     isRefetching,
-  } = useExpenses({
-    ...(filterMode === 'MONTH'
-      ? { month: currentMonthStr }
-      : {
-        startDate: appliedPeriod.start,
-        endDate: appliedPeriod.end,
-      }),
+  } = useExpenses(periodQuery);
+
+  const {
+    preview: settlementPreview,
+    isLoadingPreview,
+    settlements,
+    createSettlement,
+    isCreatingSettlement,
+    settleAccountClosing,
+    isSettling,
+    reopenSettlement,
+    isReopening,
+  } = useExpenseSettlements({
+    ...periodQuery,
+    enabled: true,
   });
+
+  const {
+    analytics,
+    isLoadingAnalytics,
+  } = useExpenseAnalytics({
+    ...periodQuery,
+    scope: activeScope === 'SHARED' || activeScope === 'PRIVATE' ? activeScope : undefined,
+    enabled: true,
+  });
+
+  const partnerMembers = useMemo(() => {
+    if (household?.members && household.members.length > 0) {
+      return household.members.map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        email: m.email,
+      }));
+    }
+    if (user) {
+      return [{ id: user.id, name: user.name, email: user.email }];
+    }
+    return [];
+  }, [household?.members, user]);
 
   const expenses = useMemo(() => {
     if (!rawExpenses || !Array.isArray(rawExpenses)) return [];
@@ -192,7 +234,8 @@ export default function ExpensesScreen() {
     const initialType = activeType === 'INCOME' ? TransactionType.INCOME : TransactionType.EXPENSE;
     setTransactionType(initialType);
     setCategory(initialType === TransactionType.INCOME ? ExpenseCategory.SALARY : ExpenseCategory.FOOD_MARKET);
-    setScope(RecordScope.PRIVATE);
+    setScope(user?.householdId ? RecordScope.SHARED : RecordScope.PRIVATE);
+    setPaidByUserId(user?.id || '');
     setCustomDate('');
     setCreateModalVisible(true);
   };
@@ -205,6 +248,7 @@ export default function ExpensesScreen() {
     setTransactionType(item.type || TransactionType.EXPENSE);
     setCategory(item.category);
     setScope(item.scope);
+    setPaidByUserId(item.paidByUserId || item.userId || user?.id || '');
     const d = new Date(item.date);
     const formattedD = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
     setCustomDate(maskDate(formattedD));
@@ -232,6 +276,7 @@ export default function ExpensesScreen() {
         type: transactionType,
         category,
         scope,
+        paidByUserId: scope === RecordScope.SHARED ? (paidByUserId || user?.id) : user?.id,
         date: isoDate,
       });
       setCreateModalVisible(false);
@@ -264,6 +309,7 @@ export default function ExpensesScreen() {
           type: transactionType,
           category,
           scope,
+          paidByUserId: scope === RecordScope.SHARED ? (paidByUserId || editingExpense.userId) : editingExpense.userId,
           ...(isoDate && { date: isoDate }),
         },
       });
@@ -271,6 +317,40 @@ export default function ExpensesScreen() {
       setEditingExpense(null);
     } catch {
       Alert.alert('Erro', `Não foi possível atualizar o ${transactionType === TransactionType.INCOME ? 'ganho' : 'gasto'}.`);
+    }
+  };
+
+  const handleCloseAccounts = async () => {
+    if (!settlementPreview) return;
+    try {
+      await createSettlement({
+        periodStart: settlementPreview.periodStart,
+        periodEnd: settlementPreview.periodEnd,
+        notes: closingNotes.trim() || undefined,
+      });
+      setClosingNotes('');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Não foi possível realizar o fechamento de contas.';
+      if (Platform.OS === 'web') alert(msg);
+      else Alert.alert('Atenção', msg);
+    }
+  };
+
+  const handleSettleClosing = async (id: string) => {
+    try {
+      await settleAccountClosing(id);
+    } catch {
+      if (Platform.OS === 'web') alert('Erro ao marcar fechamento como pago.');
+      else Alert.alert('Erro', 'Não foi possível liquidar o fechamento.');
+    }
+  };
+
+  const handleReopenClosing = async (id: string) => {
+    try {
+      await reopenSettlement(id);
+    } catch {
+      if (Platform.OS === 'web') alert('Erro ao reabrir fechamento.');
+      else Alert.alert('Erro', 'Não foi possível reabrir o fechamento.');
     }
   };
 
@@ -787,6 +867,54 @@ export default function ExpensesScreen() {
           )}
         </View>
 
+        {/* ABAS DE VISÃO: EXTRATO | FECHAR CONTAS | ANÁLISE */}
+        <View
+          style={[
+            styles.typeFilterContainer,
+            { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, marginBottom: 16 },
+          ]}
+        >
+          {(
+            [
+              { id: 'EXTRATO', label: '📋 Extrato', testID: 'expenses-tab-extrato' },
+              { id: 'CLOSING', label: '⚖️ Fechar Contas', testID: 'expenses-tab-closing' },
+              { id: 'ANALYTICS', label: '📊 Análise', testID: 'expenses-tab-analytics' },
+            ] as const
+          ).map(({ id, label, testID }) => {
+            const isSelected = activeTab === id;
+            return (
+              <TouchableOpacity
+                key={id}
+                testID={testID}
+                style={[
+                  styles.typeFilterBtn,
+                  isSelected && {
+                    backgroundColor: theme.primary,
+                    borderColor: theme.primary,
+                    elevation: 2,
+                  },
+                ]}
+                onPress={() => setActiveTab(id)}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.typeFilterText,
+                    {
+                      color: isSelected ? '#FFFFFF' : theme.textSecondary,
+                      fontWeight: isSelected ? '700' : '600',
+                    },
+                  ]}
+                >
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {activeTab === 'EXTRATO' && (
+          <>
         {/* FILTRO DE TIPO (TODOS / GASTOS / GANHOS) */}
         <View
           style={[
@@ -909,9 +1037,11 @@ export default function ExpensesScreen() {
             expenses.map((item) => {
               const isPartnerPrivate = item.scope === 'PRIVATE' && !!user?.id && item.userId !== user.id;
               const isIncome = item.type === TransactionType.INCOME;
+              const payerName = item.paidBy?.name || item.author?.name || '';
               return (
                 <TouchableOpacity
                   key={item.id}
+                  testID={`expense-card-${item.id}`}
                   style={[
                     styles.expenseCard,
                     {
@@ -950,12 +1080,41 @@ export default function ExpensesScreen() {
                     <Text style={[styles.cardCategory, { color: theme.textSecondary }]}>
                       {getCategoryLabel(item.category)}
                     </Text>
-                    <View style={styles.cardFooter}>
+                    <View style={[styles.cardFooter, { flexWrap: 'wrap' }]}>
                       <ScopeBadge
                         scope={item.scope}
                         authorName={item.author?.name}
                         isPartnerPrivate={isPartnerPrivate}
                       />
+                      {item.scope === RecordScope.SHARED && payerName ? (
+                        <View
+                          testID={`expense-payer-badge-${item.id}`}
+                          style={{
+                            paddingHorizontal: 8,
+                            paddingVertical: 2,
+                            borderRadius: 8,
+                            backgroundColor: theme.primaryLight,
+                          }}
+                        >
+                          <Text style={{ fontSize: 10.5, fontWeight: '700', color: theme.primary }}>
+                            💳 Pago por: {payerName.split(' ')[0]}
+                          </Text>
+                        </View>
+                      ) : null}
+                      {item.settlementId ? (
+                        <View
+                          style={{
+                            paddingHorizontal: 7,
+                            paddingVertical: 2,
+                            borderRadius: 8,
+                            backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                          }}
+                        >
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: '#059669' }}>
+                            ✓ Fechado
+                          </Text>
+                        </View>
+                      ) : null}
                       <Text style={[styles.cardDate, { color: theme.textMuted }]}>
                         {formatDate(item.date)}
                       </Text>
@@ -1015,10 +1174,524 @@ export default function ExpensesScreen() {
             })
           )}
         </View>
+          </>
+        )}
+
+        {/* VISÃO DE FECHAMENTO DE CONTAS (TASKS 4 & 5) */}
+        {activeTab === 'CLOSING' && (
+          <View style={{ gap: 16 }} testID="expenses-closing-view">
+            {/* CARD DE PRÉVIA & ENCONTRO DE CONTAS */}
+            <View
+              style={[
+                styles.summaryCard,
+                { backgroundColor: theme.surface, borderColor: theme.border, marginBottom: 0 },
+                theme.cardShadow,
+              ]}
+            >
+              <Text style={[styles.listSectionTitle, { color: theme.textPrimary, fontSize: 16 }]}>
+                ⚖️ Encontro de Contas do Período (50/50)
+              </Text>
+              <Text style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 14 }}>
+                Consolidação das despesas compartilhadas pendentes e cálculo líquido de quem deve transferir para quem.
+              </Text>
+
+              {/* TOTAIS DO PERÍODO */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  gap: 10,
+                  marginBottom: 14,
+                }}
+              >
+                <View
+                  style={{
+                    flex: 1,
+                    padding: 12,
+                    borderRadius: 14,
+                    backgroundColor: theme.surfaceSubtle,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                  }}
+                >
+                  <Text style={{ fontSize: 11, color: theme.textMuted, fontWeight: '700' }}>
+                    TOTAL COMPARTILHADO
+                  </Text>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: theme.textPrimary, marginTop: 4 }}>
+                    {formatCurrency(settlementPreview?.totalShared || 0)}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: theme.textSecondary, marginTop: 2 }}>
+                    {settlementPreview?.pendingExpensesCount || 0} conta(s) pendente(s)
+                  </Text>
+                </View>
+
+                <View
+                  style={{
+                    flex: 1,
+                    padding: 12,
+                    borderRadius: 14,
+                    backgroundColor: theme.surfaceSubtle,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                  }}
+                >
+                  <Text style={{ fontSize: 11, color: theme.textMuted, fontWeight: '700' }}>
+                    QUOTA POR PARCEIRO (50%)
+                  </Text>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: theme.primary, marginTop: 4 }}>
+                    {formatCurrency(settlementPreview?.quotaPerPartner || 0)}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: theme.textSecondary, marginTop: 2 }}>
+                    Divisão igualitária
+                  </Text>
+                </View>
+              </View>
+
+              {/* BREAKDOWN POR MEMBRO DO CASAL */}
+              {settlementPreview?.membersBreakdown && settlementPreview.membersBreakdown.length > 0 && (
+                <View style={{ gap: 8, marginBottom: 14 }}>
+                  {settlementPreview.membersBreakdown.map((mb) => {
+                    const isCreditor = mb.netBalance > 0;
+                    const isDebtor = mb.netBalance < 0;
+                    return (
+                      <View
+                        key={mb.userId}
+                        testID={`member-breakdown-${mb.userId}`}
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: 12,
+                          borderRadius: 12,
+                          backgroundColor: theme.surfaceSubtle,
+                          borderWidth: 1,
+                          borderColor: theme.border,
+                        }}
+                      >
+                        <View>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: theme.textPrimary }}>
+                            👤 {mb.name}
+                          </Text>
+                          <Text style={{ fontSize: 11.5, color: theme.textSecondary, marginTop: 2 }}>
+                            Pagou: {formatCurrency(mb.paidAmount)} • Quota: {formatCurrency(mb.quotaAmount)}
+                          </Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text
+                            style={{
+                              fontSize: 14,
+                              fontWeight: '800',
+                              color: isCreditor ? '#059669' : isDebtor ? '#DC2626' : theme.textSecondary,
+                            }}
+                          >
+                            {isCreditor
+                              ? `+ ${formatCurrency(mb.netBalance)}`
+                              : isDebtor
+                              ? `- ${formatCurrency(Math.abs(mb.netBalance))}`
+                              : formatCurrency(0)}
+                          </Text>
+                          <Text style={{ fontSize: 10.5, color: theme.textMuted }}>
+                            {isCreditor ? 'A receber' : isDebtor ? 'A transferir' : 'Quite'}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              {/* DESTAQUE VISUAL: QUEM DEVE TRANSFERIR PARA QUEM E O VALOR EXATO */}
+              <View
+                testID="settlement-transfer-card"
+                style={{
+                  padding: 16,
+                  borderRadius: 16,
+                  backgroundColor:
+                    settlementPreview?.transferInstruction && !settlementPreview.transferInstruction.isEven
+                      ? theme.primaryLight
+                      : 'rgba(16, 185, 129, 0.12)',
+                  borderWidth: 1.5,
+                  borderColor:
+                    settlementPreview?.transferInstruction && !settlementPreview.transferInstruction.isEven
+                      ? theme.primary
+                      : '#10B981',
+                  marginBottom: 14,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '800',
+                    textTransform: 'uppercase',
+                    color:
+                      settlementPreview?.transferInstruction && !settlementPreview.transferInstruction.isEven
+                        ? theme.primary
+                        : '#059669',
+                    marginBottom: 4,
+                  }}
+                >
+                  💸 Resumo da Transferência Líquida
+                </Text>
+
+                {settlementPreview?.transferInstruction && !settlementPreview.transferInstruction.isEven ? (
+                  <Text
+                    testID="settlement-transfer-text"
+                    style={{ fontSize: 15, fontWeight: '800', color: theme.textPrimary, lineHeight: 22 }}
+                  >
+                    {settlementPreview.transferInstruction.fromUserName} deve transferir{' '}
+                    <Text style={{ color: theme.primary, fontSize: 17 }}>
+                      {formatCurrency(settlementPreview.transferInstruction.amount)}
+                    </Text>{' '}
+                    para {settlementPreview.transferInstruction.toUserName}
+                  </Text>
+                ) : (
+                  <Text
+                    testID="settlement-transfer-text"
+                    style={{ fontSize: 14, fontWeight: '700', color: '#059669' }}
+                  >
+                    ✅ Contas 100% empatadas neste período! Nenhuma transferência pendente.
+                  </Text>
+                )}
+              </View>
+
+              <Button
+                testID="close-accounts-btn"
+                title={
+                  (settlementPreview?.pendingExpensesCount || 0) > 0
+                    ? `🔒 Fechar Contas do Período (${settlementPreview?.pendingExpensesCount})`
+                    : 'Nenhuma conta pendente para fechar'
+                }
+                onPress={handleCloseAccounts}
+                isLoading={isCreatingSettlement}
+                disabled={!settlementPreview || settlementPreview.pendingExpensesCount === 0}
+              />
+            </View>
+
+            {/* HISTÓRICO DE FECHAMENTOS REALIZADOS */}
+            <View
+              style={[
+                styles.summaryCard,
+                { backgroundColor: theme.surface, borderColor: theme.border, marginBottom: 0 },
+                theme.cardShadow,
+              ]}
+            >
+              <Text style={[styles.listSectionTitle, { color: theme.textPrimary, fontSize: 15 }]}>
+                📜 Histórico de Fechamentos ({settlements.length})
+              </Text>
+
+              {settlements.length === 0 ? (
+                <Text style={{ fontSize: 13, color: theme.textSecondary, paddingVertical: 12 }}>
+                  Nenhum fechamento registrado ainda. Clique em "Fechar Contas do Período" acima para consolidar o ciclo atual.
+                </Text>
+              ) : (
+                settlements.map((s, idx) => {
+                  const isSettled = s.status === SettlementStatus.SETTLED;
+                  return (
+                    <View
+                      key={s.id}
+                      testID={`settlement-history-item-${s.id}`}
+                      style={{
+                        padding: 14,
+                        borderRadius: 14,
+                        borderWidth: 1,
+                        borderColor: isSettled ? 'rgba(16, 185, 129, 0.35)' : theme.border,
+                        backgroundColor: theme.surfaceSubtle,
+                        marginBottom: 10,
+                      }}
+                    >
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: 6,
+                        }}
+                      >
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary }}>
+                          📅 {formatDate(s.periodStart)} a {formatDate(s.periodEnd)}
+                        </Text>
+                        <View
+                          testID={`settlement-status-${s.id}`}
+                          style={{
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                            borderRadius: 8,
+                            backgroundColor: isSettled
+                              ? 'rgba(16, 185, 129, 0.15)'
+                              : 'rgba(245, 158, 11, 0.15)',
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              fontWeight: '800',
+                              color: isSettled ? '#059669' : '#D97706',
+                            }}
+                          >
+                            {isSettled ? '✅ LIQUIDADO / PAGO' : '⏳ AGUARDANDO PAGAMENTO'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <Text style={{ fontSize: 12.5, color: theme.textSecondary, marginBottom: 6 }}>
+                        Total compartilhado: <Text style={{ fontWeight: '700' }}>{formatCurrency(s.totalShared)}</Text> ({s.expensesCount} contas)
+                      </Text>
+
+                      {s.transferAmount > 0 && s.fromUser && s.toUser ? (
+                        <Text
+                          style={{
+                            fontSize: 13.5,
+                            fontWeight: '800',
+                            color: isSettled ? '#059669' : theme.primary,
+                            marginBottom: 10,
+                          }}
+                        >
+                          👉 {s.fromUser.name} ➔ {s.toUser.name}: {formatCurrency(s.transferAmount)}
+                        </Text>
+                      ) : (
+                        <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#059669', marginBottom: 10 }}>
+                          Contas empatadas (R$ 0,00 a transferir)
+                        </Text>
+                      )}
+
+                      <View style={{ flexDirection: 'row', gap: 10 }}>
+                        {!isSettled && (
+                          <Button
+                            testID={idx === 0 ? 'settle-closing-btn' : `settle-closing-btn-${s.id}`}
+                            title="✅ Marcar como Pago/Liquidado"
+                            onPress={() => handleSettleClosing(s.id)}
+                            isLoading={isSettling}
+                            style={{ flex: 1, height: 38 }}
+                          />
+                        )}
+                        <TouchableOpacity
+                          testID={`reopen-closing-btn-${s.id}`}
+                          onPress={() => handleReopenClosing(s.id)}
+                          disabled={isReopening}
+                          style={{
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            borderRadius: 10,
+                            borderWidth: 1,
+                            borderColor: theme.border,
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textSecondary }}>
+                            ↩ Reabrir
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* VISÃO DE ANÁLISE DOS PRINCIPAIS GASTOS (TASK 6) */}
+        {activeTab === 'ANALYTICS' && (
+          <View style={{ gap: 16 }} testID="expenses-analytics-view">
+            {/* COMPARATIVO ENTRE PERÍODOS */}
+            <View
+              style={[
+                styles.summaryCard,
+                { backgroundColor: theme.surface, borderColor: theme.border, marginBottom: 0 },
+                theme.cardShadow,
+              ]}
+            >
+              <Text style={[styles.listSectionTitle, { color: theme.textPrimary, fontSize: 16 }]}>
+                📊 Comparativo & Evolução do Orçamento
+              </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+                <View>
+                  <Text style={{ fontSize: 12, color: theme.textSecondary }}>Total de Gastos no Período</Text>
+                  <Text style={{ fontSize: 24, fontWeight: '800', color: theme.textPrimary, marginTop: 2 }}>
+                    {formatCurrency(analytics?.totalExpenses || 0)}
+                  </Text>
+                  <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 2 }}>
+                    Período anterior: {formatCurrency(analytics?.previousPeriodTotal || 0)}
+                  </Text>
+                </View>
+
+                <View
+                  testID="analytics-variation-badge"
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                    borderRadius: 12,
+                    backgroundColor:
+                      (analytics?.variationPercent || 0) <= 0
+                        ? 'rgba(16, 185, 129, 0.14)'
+                        : 'rgba(239, 68, 68, 0.14)',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: '800',
+                      color: (analytics?.variationPercent || 0) <= 0 ? '#059669' : '#DC2626',
+                    }}
+                  >
+                    {(analytics?.variationPercent || 0) > 0
+                      ? `▲ +${analytics?.variationPercent}% vs anterior`
+                      : `▼ ${analytics?.variationPercent || 0}% vs anterior`}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* MAIORES CATEGORIAS DE DESPESA */}
+            <View
+              testID="analytics-category-list"
+              style={[
+                styles.summaryCard,
+                { backgroundColor: theme.surface, borderColor: theme.border, marginBottom: 0 },
+                theme.cardShadow,
+              ]}
+            >
+              <Text style={[styles.listSectionTitle, { color: theme.textPrimary, fontSize: 15 }]}>
+                🏷️ Gastos por Categoria
+              </Text>
+              {!analytics?.byCategory || analytics.byCategory.length === 0 ? (
+                <Text style={{ fontSize: 13, color: theme.textSecondary }}>
+                  Sem despesas registradas neste período para análise por categoria.
+                </Text>
+              ) : (
+                analytics.byCategory.map((cat) => (
+                  <View key={cat.category} style={{ marginBottom: 12 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary }}>
+                        {getCategoryLabel(cat.category)} ({cat.count})
+                      </Text>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: theme.textPrimary }}>
+                        {formatCurrency(cat.total)} ({cat.percentage}%)
+                      </Text>
+                    </View>
+                    <View
+                      style={{
+                        height: 8,
+                        borderRadius: 4,
+                        backgroundColor: theme.surfaceSubtle,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: `${Math.min(100, Math.max(4, cat.percentage))}%`,
+                          height: '100%',
+                          backgroundColor: theme.primary,
+                          borderRadius: 4,
+                        }}
+                      />
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+
+            {/* EVOLUÇÃO TEMPORAL (ÚLTIMOS 6 MESES) */}
+            <View
+              testID="analytics-monthly-evolution"
+              style={[
+                styles.summaryCard,
+                { backgroundColor: theme.surface, borderColor: theme.border, marginBottom: 0 },
+                theme.cardShadow,
+              ]}
+            >
+              <Text style={[styles.listSectionTitle, { color: theme.textPrimary, fontSize: 15 }]}>
+                📈 Evolução Temporal (Últimos 6 Meses)
+              </Text>
+              {(() => {
+                const evo = analytics?.monthlyEvolution || [];
+                const maxVal = Math.max(1, ...evo.map((m) => m.total));
+                return (
+                  <View style={{ gap: 8, marginTop: 4 }}>
+                    {evo.map((m) => (
+                      <View key={m.month} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <Text style={{ width: 62, fontSize: 11.5, fontWeight: '700', color: theme.textSecondary }}>
+                          {m.month}
+                        </Text>
+                        <View
+                          style={{
+                            flex: 1,
+                            height: 10,
+                            borderRadius: 5,
+                            backgroundColor: theme.surfaceSubtle,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <View
+                            style={{
+                              width: `${Math.min(100, (m.total / maxVal) * 100)}%`,
+                              height: '100%',
+                              backgroundColor: '#8B5CF6',
+                              borderRadius: 5,
+                            }}
+                          />
+                        </View>
+                        <Text style={{ width: 88, fontSize: 11.5, fontWeight: '700', color: theme.textPrimary, textAlign: 'right' }}>
+                          {formatCurrency(m.total)}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                );
+              })()}
+            </View>
+
+            {/* TOP 5 PRINCIPAIS OFENSORES DO ORÇAMENTO */}
+            <View
+              testID="analytics-top-offenders"
+              style={[
+                styles.summaryCard,
+                { backgroundColor: theme.surface, borderColor: theme.border, marginBottom: 0 },
+                theme.cardShadow,
+              ]}
+            >
+              <Text style={[styles.listSectionTitle, { color: theme.textPrimary, fontSize: 15 }]}>
+                🚨 Principais Ofensores do Orçamento (Top 5)
+              </Text>
+              {!analytics?.topOffenders || analytics.topOffenders.length === 0 ? (
+                <Text style={{ fontSize: 13, color: theme.textSecondary }}>
+                  Sem despesas para exibir no ranking de maiores gastos.
+                </Text>
+              ) : (
+                analytics.topOffenders.map((off, idx) => (
+                  <View
+                    key={off.id}
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      paddingVertical: 9,
+                      borderBottomWidth: idx < analytics.topOffenders.length - 1 ? StyleSheet.hairlineWidth : 0,
+                      borderBottomColor: theme.border,
+                    }}
+                  >
+                    <View style={{ flex: 1, marginRight: 10 }}>
+                      <Text style={{ fontSize: 13.5, fontWeight: '700', color: theme.textPrimary }} numberOfLines={1}>
+                        #{idx + 1} {off.description}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: theme.textSecondary }}>
+                        {getCategoryLabel(off.category)} • {formatDate(off.date)}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#DC2626' }}>
+                      {formatCurrency(off.amount)}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </View>
+          </View>
+        )}
       </ScrollView>
 
       {/* FAB FLUTUANTE NA ZONA DO POLEGAR */}
       <TouchableOpacity
+        testID="new-expense-fab"
         style={[styles.fabButton, { backgroundColor: theme.primary }, theme.fabShadow]}
         onPress={handleOpenCreate}
         activeOpacity={0.85}
@@ -1156,12 +1829,13 @@ export default function ExpensesScreen() {
                 onChangeText={setAmount}
               />
 
-              <Input
-                label="Data (Opcional - DD/MM/AAAA)"
-                placeholder="DD/MM/AAAA (em branco para hoje)"
-                mask="date"
+              <CalendarDatePicker
+                testID="expense-create-date-picker"
+                label="Data (Opcional)"
+                placeholder="Hoje (Toque para escolher no calendário)"
                 value={customDate}
-                onChangeText={setCustomDate}
+                onChange={setCustomDate}
+                outputFormat="BR"
               />
 
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
@@ -1210,6 +1884,19 @@ export default function ExpensesScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
+
+              {scope === RecordScope.SHARED && partnerMembers.length > 0 && (
+                <View style={{ marginTop: 14 }}>
+                  <PartnerSelect
+                    testID="expense-payer-select"
+                    label="💳 Quem pagou esta conta compartilhada?"
+                    members={partnerMembers}
+                    selectedUserId={paidByUserId || user?.id || ''}
+                    currentUserId={user?.id}
+                    onSelect={setPaidByUserId}
+                  />
+                </View>
+              )}
 
               <Text style={[styles.fieldLabel, { color: theme.textSecondary, marginTop: 16 }]}>
                 Categoria
@@ -1367,12 +2054,13 @@ export default function ExpensesScreen() {
                 onChangeText={setAmount}
               />
 
-              <Input
-                label="Data (DD/MM/AAAA)"
-                placeholder="DD/MM/AAAA"
-                mask="date"
+              <CalendarDatePicker
+                testID="expense-edit-date-picker"
+                label="Data"
+                placeholder="Escolher data no calendário"
                 value={customDate}
-                onChangeText={setCustomDate}
+                onChange={setCustomDate}
+                outputFormat="BR"
               />
 
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
@@ -1421,6 +2109,19 @@ export default function ExpensesScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
+
+              {scope === RecordScope.SHARED && partnerMembers.length > 0 && (
+                <View style={{ marginTop: 14 }}>
+                  <PartnerSelect
+                    testID="expense-payer-select"
+                    label="💳 Quem pagou esta conta compartilhada?"
+                    members={partnerMembers}
+                    selectedUserId={paidByUserId || user?.id || ''}
+                    currentUserId={user?.id}
+                    onSelect={setPaidByUserId}
+                  />
+                </View>
+              )}
 
               <Text style={[styles.fieldLabel, { color: theme.textSecondary, marginTop: 16 }]}>
                 Categoria

@@ -77,6 +77,13 @@ const NAV_ITEMS: NavItem[] = [
     route: '/(tabs)/calendar',
     icon: '📅',
   },
+  {
+    id: 'workouts',
+    title: 'Treinos & Fitness',
+    subtitle: 'Corrida e Musculação',
+    route: '/(tabs)/workouts',
+    icon: '🏋️',
+  },
 ];
 
 export function AppDrawer() {
@@ -213,6 +220,7 @@ export function AppDrawer() {
               return (
                 <TouchableOpacity
                   key={item.id}
+                  testID={`drawer-nav-${item.id}`}
                   style={[
                     styles.menuItem,
                     isActive && {

@@ -39,6 +39,42 @@ enum GoalStatus {
   PAUSED
 }
 
+enum NotificationType {
+  SHARED_EXPENSE_CREATED
+  ACCOUNT_CLOSING_CREATED
+  ACCOUNT_CLOSING_SETTLED
+  SHARED_EVENT_CREATED
+  SHARED_TASK_CREATED
+  EVENT_REMINDER
+  TASK_REMINDER
+  WORKOUT_LOGGED
+  WORKOUT_CHEER
+  SYSTEM
+}
+
+enum SettlementStatus {
+  PENDING
+  SETTLED
+}
+
+enum WorkoutModality {
+  RUNNING
+  STRENGTH
+  OTHER
+}
+
+enum WorkoutStatus {
+  COMPLETED
+  PLANNED
+}
+
+enum FitnessProvider {
+  MANUAL
+  STRAVA
+  GARMIN
+  MFIT
+}
+
 model User {
   id           String      @id @default(uuid())
   email        String      @unique
@@ -55,20 +91,36 @@ model User {
   householdId  String?
   household    Household?  @relation(fields: [householdId], references: [id], onDelete: SetNull)
 
-  expenses     Expense[]
-  goals        Goal[]
-  tasks        Task[]
-  shoppingItems ShoppingItem[]
-  dailySummaryTime      String?   @default("06:00")
-  enableDailySummary    Boolean   @default(true)
-  periodicSummaryType   String?   @default("WEEKLY")
-  periodicSummaryDay    Int?      @default(1)
-  lastDailySummaryDate  String?
-  lastPeriodicDate      String?
-  googleAccessToken     String?
-  googleRefreshToken    String?
-  calendarEvents        CalendarEvent[]
-  sharePrivateExpenses  Boolean   @default(false)
+  expenses                Expense[]
+  paidExpenses            Expense[]                @relation("ExpensePayer")
+  goals                   Goal[]
+  tasks                   Task[]
+  shoppingItems           ShoppingItem[]
+  dailySummaryTime        String?                  @default("06:00")
+  enableDailySummary      Boolean                  @default(true)
+  periodicSummaryType     String?                  @default("WEEKLY")
+  periodicSummaryDay      Int?                     @default(1)
+  periodicSummaryTime     String?                  @default("08:00")
+  timezone                String                   @default("America/Sao_Paulo")
+  lastDailySummaryDate    String?
+  lastPeriodicDate        String?
+  lastDailySentAt         DateTime?
+  lastDigestSentAt        DateTime?
+  expoPushToken           String?
+  googleAccessToken       String?
+  googleRefreshToken      String?
+  calendarEvents          CalendarEvent[]
+  sharePrivateExpenses    Boolean                  @default(false)
+
+  refreshTokens           RefreshToken[]
+  notifications           Notification[]           @relation("NotificationRecipient")
+  triggeredNotifications  Notification[]           @relation("NotificationActor")
+  notificationPreferences NotificationPreference[]
+  closedSettlements       Settlement[]             @relation("SettlementCloser")
+  debtorSettlements       Settlement[]             @relation("SettlementDebtor")
+  creditorSettlements     Settlement[]             @relation("SettlementCreditor")
+  workouts                WorkoutActivity[]
+  fitnessIntegrations     FitnessIntegration[]
 
   @@index([phoneNumber])
 }
@@ -80,44 +132,127 @@ model Household {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  members     User[]
-  expenses    Expense[]
-  goals       Goal[]
-  tasks       Task[]
-  shoppingItems ShoppingItem[]
-  dailySummaryTime      String?   @default("06:00")
-  enableDailySummary    Boolean   @default(true)
-  periodicSummaryType   String?   @default("WEEKLY")
-  periodicSummaryDay    Int?      @default(1)
+  members               User[]
+  expenses              Expense[]
+  goals                 Goal[]
+  tasks                 Task[]
+  shoppingItems         ShoppingItem[]
+  dailySummaryTime      String?           @default("06:00")
+  enableDailySummary    Boolean           @default(true)
+  periodicSummaryType   String?           @default("WEEKLY")
+  periodicSummaryDay    Int?              @default(1)
+  periodicSummaryTime   String?           @default("08:00")
   lastDailySummaryDate  String?
   lastPeriodicDate      String?
   googleAccessToken     String?
   googleRefreshToken    String?
   calendarEvents        CalendarEvent[]
+  settlements           Settlement[]
+  workouts              WorkoutActivity[]
 }
 
 model Expense {
-  id          String          @id @default(uuid())
-  description String
-  amount      Decimal         @db.Decimal(10, 2)
-  type        TransactionType @default(EXPENSE)
-  category    ExpenseCategory @default(OTHER)
-  date        DateTime        @default(now())
-  scope       RecordScope     @default(PRIVATE)
-  rawSource   String?
+  id           String          @id @default(uuid())
+  description  String
+  amount       Decimal         @db.Decimal(10, 2)
+  type         TransactionType @default(EXPENSE)
+  category     ExpenseCategory @default(OTHER)
+  date         DateTime        @default(now())
+  scope        RecordScope     @default(PRIVATE)
+  rawSource    String?
 
-  userId      String
-  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  householdId String?
-  household   Household?      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  paidByUserId String?
+  paidBy       User?           @relation("ExpensePayer", fields: [paidByUserId], references: [id], onDelete: SetNull)
 
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  settlementId String?
+  settlement   Settlement?     @relation(fields: [settlementId], references: [id], onDelete: SetNull)
+
+  householdId  String?
+  household    Household?      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
   @@index([userId, scope])
   @@index([householdId, scope])
+  @@index([paidByUserId])
+  @@index([settlementId])
   @@index([date])
+}
+
+model Settlement {
+  id             String           @id @default(uuid())
+  householdId    String
+  household      Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  periodStart    DateTime
+  periodEnd      DateTime
+  totalShared    Decimal          @db.Decimal(10, 2)
+  breakdown      Json
+  fromUserId     String?
+  fromUser       User?            @relation("SettlementDebtor", fields: [fromUserId], references: [id], onDelete: SetNull)
+  toUserId       String?
+  toUser         User?            @relation("SettlementCreditor", fields: [toUserId], references: [id], onDelete: SetNull)
+  transferAmount Decimal          @db.Decimal(10, 2)
+  status         SettlementStatus @default(PENDING)
+  closedByUserId String
+  closedBy       User             @relation("SettlementCloser", fields: [closedByUserId], references: [id], onDelete: Cascade)
+  settledAt      DateTime?
+  notes          String?
+  expenses       Expense[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([householdId, status])
+  @@index([householdId, periodStart, periodEnd])
+}
+
+model RefreshToken {
+  id                String    @id @default(uuid())
+  tokenHash         String
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  replacedByTokenId String?
+  userAgent         String?
+  createdAt         DateTime  @default(now())
+
+  @@index([userId, revokedAt])
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  userId      String
+  user        User             @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  actorId     String?
+  actor       User?            @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+  householdId String?
+  type        NotificationType
+  title       String
+  body        String
+  deepLink    String?
+  metadata    Json?
+  channels    String[]
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+
+  @@index([userId, readAt, createdAt])
+}
+
+model NotificationPreference {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category       String
+  enableInApp    Boolean  @default(true)
+  enablePush     Boolean  @default(true)
+  enableWhatsapp Boolean  @default(true)
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, category])
 }
 
 model Goal {
@@ -169,12 +304,13 @@ model ProcessedWebhookEvent {
 }
 
 model ShoppingItem {
-  id          String      @id @default(uuid())
-  name        String
-  quantity    String?     @default("1")
-  category    String?     @default("Geral")
-  isCompleted Boolean     @default(false)
-  scope       RecordScope @default(SHARED)
+  id             String      @id @default(uuid())
+  name           String
+  normalizedName String?
+  quantity       String?     @default("1")
+  category       String?     @default("Geral")
+  isCompleted    Boolean     @default(false)
+  scope          RecordScope @default(SHARED)
 
   userId      String
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -186,6 +322,7 @@ model ShoppingItem {
   updatedAt   DateTime    @updatedAt
 
   @@index([householdId, isCompleted])
+  @@index([householdId, normalizedName])
   @@index([userId, isCompleted])
 }
 
@@ -204,12 +341,15 @@ model CalendarEvent {
   etag             String?
   scope            RecordScope @default(SHARED)
   attendees        String?
+  reminderSent     Boolean     @default(false)
 
   userId           String
   user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   householdId      String?
   household        Household?  @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  workoutActivities WorkoutActivity[]
 
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
@@ -221,22 +361,73 @@ model CalendarEvent {
 }
 
 model GoogleCalendarSyncState {
-  id             String    @id @default(uuid())
-  userId         String
-  calendarId     String
-  calendarName   String?
+  id              String    @id @default(uuid())
+  userId          String
+  calendarId      String
+  calendarName    String?
   backgroundColor String?
   foregroundColor String?
-  channelId      String?   @unique
-  resourceId     String?
-  expiration     DateTime?
-  syncToken      String?
-  lastSyncedAt   DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  channelId       String?   @unique
+  resourceId      String?
+  expiration      DateTime?
+  syncToken       String?
+  lastSyncedAt    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@unique([userId, calendarId])
   @@index([userId])
   @@index([channelId])
 }
 
+model WorkoutActivity {
+  id               String          @id @default(uuid())
+  userId           String
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  householdId      String?
+  household        Household?      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  modality         WorkoutModality
+  status           WorkoutStatus   @default(COMPLETED)
+  provider         FitnessProvider @default(MANUAL)
+  externalId       String?
+  title            String
+  notes            String?
+  startedAt        DateTime        @default(now())
+  durationMinutes  Int
+  calories         Int?
+  distanceKm       Decimal?        @db.Decimal(6, 2)
+  paceSecondsPerKm Int?
+  elevationGainM   Int?
+  totalVolumeKg    Decimal?        @db.Decimal(10, 2)
+  setsCount        Int?
+  exercisesJson    Json?
+  scope            RecordScope     @default(SHARED)
+  calendarEventId  String?
+  calendarEvent    CalendarEvent?  @relation(fields: [calendarEventId], references: [id], onDelete: SetNull)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@unique([provider, externalId])
+  @@index([householdId, startedAt])
+  @@index([userId, startedAt])
+  @@index([status, startedAt])
+  @@index([calendarEventId])
+}
+
+model FitnessIntegration {
+  id           String          @id @default(uuid())
+  userId       String
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider     FitnessProvider
+  accessToken  String?
+  refreshToken String?
+  apiKey       String?
+  calendarUrl  String?
+  athleteId    String?
+  isActive     Boolean         @default(true)
+  lastSyncedAt DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@unique([userId, provider])
+}

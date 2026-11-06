@@ -3,6 +3,7 @@ import {
   CreateShoppingItemDto,
   UpdateShoppingItemDto,
   ShoppingItemDto,
+  TopShoppingItemDto,
   RecordScope,
 } from '../../../packages/shared/src';
 
@@ -11,6 +12,24 @@ export const shoppingListService = {
     const { data } = await apiClient.get<ShoppingItemDto[]>('/shopping-list', {
       params: { scope },
     });
+    return data;
+  },
+
+  async getTopItems(limit = 15): Promise<TopShoppingItemDto[]> {
+    const { data } = await apiClient.get<TopShoppingItemDto[]>(
+      '/shopping-list/analytics/top-items',
+      { params: { limit } },
+    );
+    return data;
+  },
+
+  async readdItem(dto: {
+    name: string;
+    category?: string;
+    quantity?: string;
+    scope?: RecordScope;
+  }): Promise<ShoppingItemDto> {
+    const { data } = await apiClient.post<ShoppingItemDto>('/shopping-list/readd', dto);
     return data;
   },
 

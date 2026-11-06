@@ -19,6 +19,7 @@ import { RecordScope, TaskDto } from '../../../packages/shared/src';
 import { useTasks } from '../../src/hooks/useTasks';
 import { useTheme } from '../../src/theme/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import { CalendarDatePicker } from '../../src/components/CalendarDatePicker';
 import { maskDateTime } from '../../src/utils/format';
 
 const HarryLogo = require('../../assets/harry-logo.png');
@@ -730,26 +731,19 @@ export default function TasksScreen() {
                 autoFocus
               />
 
-              {/* Campo de Data e Horário */}
-              <Text style={[styles.fieldLabel, { color: theme.textPrimary, marginTop: 16 }]}>
-                Data e Horário (Opcional)
-              </Text>
-              <TextInput
-                style={[
-                  styles.formInput,
-                  {
-                    backgroundColor: theme.inputBg,
-                    borderColor: theme.inputBorder,
-                    color: theme.textPrimary,
-                  },
-                ]}
-                placeholder="DD/MM/AAAA ou DD/MM/AAAA HH:MM"
-                placeholderTextColor={theme.textMuted}
-                value={dueDateStr}
-                onChangeText={(t) => setDueDateStr(maskDateTime(t))}
-                keyboardType="numeric"
-                maxLength={16}
-              />
+              {/* Campo de Data e Horário via Calendário */}
+              <View style={{ marginTop: 16 }}>
+                <CalendarDatePicker
+                  testID="task-create-date-picker"
+                  label="Data e Horário (Opcional)"
+                  placeholder="Escolher data e hora no calendário"
+                  value={dueDateStr}
+                  onChange={setDueDateStr}
+                  outputFormat="BR"
+                  includeTime
+                  defaultTime="18:00"
+                />
+              </View>
 
               {/* Presets Rápidos de Data (1 toque com o polegar) */}
               <View style={styles.presetsContainer}>
@@ -918,25 +912,18 @@ export default function TasksScreen() {
                 onChangeText={setTitle}
               />
 
-              <Text style={[styles.fieldLabel, { color: theme.textPrimary, marginTop: 16 }]}>
-                Data e Horário (DD/MM/AAAA ou DD/MM/AAAA HH:MM)
-              </Text>
-              <TextInput
-                style={[
-                  styles.formInput,
-                  {
-                    backgroundColor: theme.inputBg,
-                    borderColor: theme.inputBorder,
-                    color: theme.textPrimary,
-                  },
-                ]}
-                placeholder="DD/MM/AAAA ou DD/MM/AAAA HH:MM"
-                placeholderTextColor={theme.textMuted}
-                value={dueDateStr}
-                onChangeText={(t) => setDueDateStr(maskDateTime(t))}
-                keyboardType="numeric"
-                maxLength={16}
-              />
+              <View style={{ marginTop: 16 }}>
+                <CalendarDatePicker
+                  testID="task-edit-date-picker"
+                  label="Data e Horário"
+                  placeholder="Escolher data e hora no calendário"
+                  value={dueDateStr}
+                  onChange={setDueDateStr}
+                  outputFormat="BR"
+                  includeTime
+                  defaultTime="18:00"
+                />
+              </View>
 
               {/* Atalhos Rápidos */}
               <View style={styles.presetsContainer}>

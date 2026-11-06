@@ -10,7 +10,11 @@ import {
 } from '@nestjs/common';
 import { ExpensesService } from './expenses.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { CreateExpenseDto, UpdateExpenseDto } from '../../../../packages/shared/src';
+import {
+  CreateExpenseDto,
+  UpdateExpenseDto,
+  CreateSettlementDto,
+} from '../../../../packages/shared/src';
 
 @Controller('expenses')
 export class ExpensesController {
@@ -35,6 +39,56 @@ export class ExpensesController {
     @Query('category') category?: string,
   ) {
     return this.expensesService.findAll(userId, { month, startDate, endDate, scope, type, category });
+  }
+
+  @Get('analytics')
+  async getAnalytics(
+    @CurrentUser('userId') userId: string,
+    @Query('month') month?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('scope') scope?: string,
+  ) {
+    return this.expensesService.getAnalytics(userId, { month, startDate, endDate, scope });
+  }
+
+  @Get('settlements/preview')
+  async getSettlementPreview(
+    @CurrentUser('userId') userId: string,
+    @Query('month') month?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.expensesService.getSettlementPreview(userId, { month, startDate, endDate });
+  }
+
+  @Get('settlements')
+  async listSettlements(@CurrentUser('userId') userId: string) {
+    return this.expensesService.listSettlements(userId);
+  }
+
+  @Post('settlements')
+  async createSettlement(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: CreateSettlementDto,
+  ) {
+    return this.expensesService.createSettlement(userId, dto);
+  }
+
+  @Patch('settlements/:id/settle')
+  async settleAccountClosing(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.expensesService.markSettlementAsPaid(userId, id);
+  }
+
+  @Delete('settlements/:id')
+  async reopenSettlement(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.expensesService.reopenSettlement(userId, id);
   }
 
   @Get(':id')

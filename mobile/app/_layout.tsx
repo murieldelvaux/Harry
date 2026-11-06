@@ -3,9 +3,11 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Platform } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { appQueryClient } from '../src/services/queryClient';
 import { authService } from '../src/services/auth.service';
+import { notificationService } from '../src/services/notification.service';
 import { queryKeys } from '../src/services/queryKeys';
 import { ThemeProvider, useTheme } from '../src/theme/ThemeContext';
 import { DrawerProvider } from '../src/context/DrawerContext';
@@ -33,10 +35,30 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   // Ativa sincronização instantânea em tempo real via Server-Sent Events (SSE)
   useRealtimeSync(!!userQuery.data);
 
+  // Registra Push Token e listener de deep-link de notificações (Task 2)
+  useEffect(() => {
+    if (!userQuery.data) return;
+    notificationService.registerDevicePushToken().catch(() => {});
+
+    if (Platform.OS === 'web') return;
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const url = response.notification.request.content.data?.url as string | undefined;
+      if (url) {
+        router.push(url as any);
+      }
+    });
+    return () => sub.remove();
+  }, [userQuery.data, router]);
+
   useEffect(() => {
     if (userQuery.isLoading) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
+    const segs = segments as string[];
+    const inAuthGroup =
+      segs[0] === '(auth)' ||
+      segs.includes('login') ||
+      segs.includes('register') ||
+      segs.includes('forgot-password');
     const isAuthenticated = !!userQuery.data;
 
     if (!isAuthenticated && !inAuthGroup) {
@@ -46,7 +68,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       // Redireciona direto para as abas principais se já autenticado
       router.replace('/(tabs)');
     }
-  }, [userQuery.isLoading, userQuery.data, segments]);
+  }, [userQuery.isLoading, userQuery.data, segments, router]);
 
   // Tela de loading enquanto verifica autenticação
   if (userQuery.isLoading) {

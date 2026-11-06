@@ -22,6 +22,8 @@ import { Button } from '../../src/components/Button';
 import { maskPhone, maskTime } from '../../src/utils/format';
 import { notificationService } from '../../src/services/notification.service';
 import { calendarService } from '../../src/services/calendar.service';
+import { useNotifications } from '../../src/hooks/useNotifications';
+import { NotificationCategory, NotificationPreferenceDto } from '@harry/shared';
 
 // Avatares rápidos disponíveis para escolha
 const AVATAR_PRESETS = [
@@ -85,10 +87,20 @@ export default function ProfileScreen() {
   const [joinError, setJoinError] = useState('');
   const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber ? maskPhone(user.phoneNumber) : '');
   const [phoneSaved, setPhoneSaved] = useState(false);
-  // Estados de Notificação e Resumos
-  const [dailyTime, setDailyTime] = useState(user?.dailySummaryTime ? maskTime(user.dailySummaryTime) : '06:00');
-  const [enableDaily, setEnableDaily] = useState(user?.enableDailySummary !== false);
-  const [periodicType, setPeriodicType] = useState<string>(user?.periodicSummaryType || "none");
+  // Estados de Notificação e Resumos (Task 7 + Task 2)
+  const { preferences: notifPrefs, updatePreferences } = useNotifications(true);
+  const [localPrefs, setLocalPrefs] = useState<NotificationPreferenceDto[]>([]);
+  const [dailyTime, setDailyTime] = useState((user as any)?.dailySummaryTime ? maskTime((user as any).dailySummaryTime) : '07:30');
+  const [enableDaily, setEnableDaily] = useState((user as any)?.enableDailySummary !== false);
+  const [periodicType, setPeriodicType] = useState<string>(
+    ((user as any)?.periodicSummaryType || 'weekly').toLowerCase(),
+  );
+  const [periodicDay, setPeriodicDay] = useState<number>(
+    typeof (user as any)?.periodicSummaryDay === 'number' ? (user as any).periodicSummaryDay : 1,
+  );
+  const [periodicTime, setPeriodicTime] = useState<string>(
+    (user as any)?.periodicSummaryTime ? maskTime((user as any).periodicSummaryTime) : '08:30',
+  );
   const [isSavingNotifs, setIsSavingNotifs] = useState(false);
   const [isTestingBriefing, setIsTestingBriefing] = useState(false);
   const [isTestingLocalNotif, setIsTestingLocalNotif] = useState(false);
@@ -96,12 +108,37 @@ export default function ProfileScreen() {
   const [briefingPreviewText, setBriefingPreviewText] = useState('');
   const [briefingStatus, setBriefingStatus] = useState('');
 
+  useEffect(() => {
+    if (notifPrefs && notifPrefs.length > 0 && localPrefs.length === 0) {
+      setLocalPrefs(notifPrefs);
+    }
+  }, [notifPrefs, localPrefs.length]);
+
+  useEffect(() => {
+    if ((user as any)?.dailySummaryTime) setDailyTime(maskTime((user as any).dailySummaryTime));
+    if ((user as any)?.periodicSummaryType) setPeriodicType(String((user as any).periodicSummaryType).toLowerCase());
+    if (typeof (user as any)?.periodicSummaryDay === 'number') setPeriodicDay((user as any).periodicSummaryDay);
+    if ((user as any)?.periodicSummaryTime) setPeriodicTime(maskTime((user as any).periodicSummaryTime));
+  }, [(user as any)?.dailySummaryTime, (user as any)?.periodicSummaryType, (user as any)?.periodicSummaryDay, (user as any)?.periodicSummaryTime]);
+
   // Sincroniza agendamento no celular local ao montar
   useEffect(() => {
-    if (user?.enableDailySummary !== false) {
-      notificationService.scheduleDailyBriefing(user?.dailySummaryTime || '06:00');
+    if ((user as any)?.enableDailySummary !== false) {
+      notificationService.scheduleDailyBriefing((user as any)?.dailySummaryTime || '07:30');
     }
-  }, [user?.enableDailySummary, user?.dailySummaryTime]);
+  }, [(user as any)?.enableDailySummary, (user as any)?.dailySummaryTime]);
+
+  const handleToggleChannelPref = (
+    category: NotificationCategory,
+    field: 'enableInApp' | 'enablePush' | 'enableWhatsapp',
+  ) => {
+    setLocalPrefs((prev) => {
+      const base = prev.length > 0 ? prev : notifPrefs;
+      return base.map((p) =>
+        p.category === category ? { ...p, [field]: !p[field] } : p,
+      );
+    });
+  };
 
   const handleSaveNotificationSettings = async () => {
     setIsSavingNotifs(true);
@@ -110,7 +147,13 @@ export default function ProfileScreen() {
         dailySummaryTime: dailyTime,
         enableDailySummary: enableDaily,
         periodicSummaryType: periodicType,
-      });
+        periodicSummaryDay: periodicDay,
+        periodicSummaryTime: periodicTime,
+      } as any);
+
+      if (localPrefs.length > 0) {
+        await updatePreferences(localPrefs);
+      }
 
       if (enableDaily) {
         await notificationService.scheduleDailyBriefing(dailyTime);
@@ -119,11 +162,11 @@ export default function ProfileScreen() {
       }
 
       showMessage(
-        "Preferências Salvas!",
-        `Seu resumo diário foi configurado para as ${dailyTime} com Agenda, Lembretes e Lista de Compras.`
+        'Preferências Salvas!',
+        `Seu resumo diário (${dailyTime}) e resumo ${periodicType === 'biweekly' ? 'quinzenal' : periodicType === 'weekly' ? 'semanal' : 'periódico'} (${periodicTime}) foram atualizados com sucesso.`,
       );
     } catch {
-      showMessage("Erro", "Não foi possível salvar as configurações de notificação.");
+      showMessage('Erro', 'Não foi possível salvar as configurações de notificação.');
     } finally {
       setIsSavingNotifs(false);
     }
@@ -466,12 +509,40 @@ export default function ProfileScreen() {
             {enableDaily && (
               <View style={{ marginTop: 10 }}>
                 <Input
-                  label="Horário do envio matinal (Horário de Brasília)"
-                  placeholder="06:00"
+                  testID="daily-summary-time-input"
+                  label="Horário exato do envio diário (HH:mm)"
+                  placeholder="07:30"
                   mask="time"
                   value={dailyTime}
                   onChangeText={setDailyTime}
                 />
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: -4, marginBottom: 8 }}>
+                  {['06:30', '07:00', '07:30', '08:00', '09:00'].map((preset) => (
+                    <TouchableOpacity
+                      key={preset}
+                      testID={`daily-time-preset-${preset}`}
+                      onPress={() => setDailyTime(preset)}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: dailyTime === preset ? theme.primary : theme.border,
+                        backgroundColor: dailyTime === preset ? theme.primaryLight : theme.surfaceSubtle,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11.5,
+                          fontWeight: '700',
+                          color: dailyTime === preset ? theme.primary : theme.textSecondary,
+                        }}
+                      >
+                        ⏰ {preset}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
             )}
 
@@ -506,20 +577,21 @@ export default function ProfileScreen() {
 
             <View style={{ marginTop: 14 }}>
               <Text style={[styles.settingRowTitle, { color: theme.textPrimary, marginBottom: 4 }]}>
-                Visão Geral Periódica
+                Resumo Estendido (Semanal ou Quinzenal)
               </Text>
               <Text style={[styles.settingRowDesc, { color: theme.textSecondary, marginBottom: 10 }]}>
-                Receba um panorama completo dos compromissos e tarefas futuras da semana.
+                Escolha a frequência, o dia da semana e o horário exato para receber o panorama estendido da agenda.
               </Text>
 
               <View style={styles.periodicSelector}>
                 {[
                   { id: "none", label: "Desativado" },
-                  { id: "weekly", label: "Semanal (Segundas)" },
+                  { id: "weekly", label: "Semanal" },
                   { id: "biweekly", label: "Quinzenal" },
                 ].map((opt) => (
                   <TouchableOpacity
                     key={opt.id}
+                    testID={`digest-freq-${opt.id}`}
                     style={[
                       styles.periodicOption,
                       periodicType === opt.id && {
@@ -545,9 +617,142 @@ export default function ProfileScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
+
+              {periodicType !== 'none' && (
+                <View style={{ marginTop: 12 }}>
+                  <Text style={[styles.settingRowDesc, { color: theme.textSecondary, fontWeight: '700', marginBottom: 8 }]}>
+                    Dia da semana do resumo {periodicType === 'biweekly' ? 'quinzenal' : 'semanal'}:
+                  </Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                    {[
+                      { day: 0, label: 'Dom' },
+                      { day: 1, label: 'Seg' },
+                      { day: 2, label: 'Ter' },
+                      { day: 3, label: 'Qua' },
+                      { day: 4, label: 'Qui' },
+                      { day: 5, label: 'Sex' },
+                      { day: 6, label: 'Sáb' },
+                    ].map((d) => {
+                      const isSel = periodicDay === d.day;
+                      return (
+                        <TouchableOpacity
+                          key={d.day}
+                          testID={`digest-day-${d.day}`}
+                          onPress={() => setPeriodicDay(d.day)}
+                          style={{
+                            paddingHorizontal: 11,
+                            paddingVertical: 7,
+                            borderRadius: 10,
+                            borderWidth: 1,
+                            borderColor: isSel ? theme.primary : theme.border,
+                            backgroundColor: isSel ? theme.primary : theme.surfaceSubtle,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              fontWeight: '700',
+                              color: isSel ? '#FFFFFF' : theme.textPrimary,
+                            }}
+                          >
+                            {d.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  <Input
+                    testID="digest-time-input"
+                    label="Horário exato do resumo estendido (HH:mm)"
+                    placeholder="08:30"
+                    mask="time"
+                    value={periodicTime}
+                    onChangeText={setPeriodicTime}
+                  />
+                </View>
+              )}
+            </View>
+
+            {/* PREFERÊNCIAS DE CANAIS POR CATEGORIA (TASK 2) */}
+            <View style={{ marginTop: 14 }}>
+              <Text style={[styles.settingRowTitle, { color: theme.textPrimary, marginBottom: 4 }]}>
+                Canais de Alerta do Casal (In-App, Push & WhatsApp)
+              </Text>
+              <Text style={[styles.settingRowDesc, { color: theme.textSecondary, marginBottom: 10 }]}>
+                Escolha como deseja ser avisado quando seu parceiro(a) atualizar itens compartilhados:
+              </Text>
+
+              {(localPrefs.length > 0 ? localPrefs : notifPrefs).map((pref) => {
+                const labelMap: Record<string, string> = {
+                  FINANCES: '💸 Finanças & Fechamento',
+                  CALENDAR: '📅 Agenda & Lembretes',
+                  SHOPPING: '🛒 Lista de Compras',
+                  WORKOUTS: '🏋️ Treinos & Incentivos',
+                };
+                return (
+                  <View
+                    key={pref.category}
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      paddingVertical: 9,
+                      borderBottomWidth: StyleSheet.hairlineWidth,
+                      borderBottomColor: theme.border,
+                    }}
+                  >
+                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: theme.textPrimary, flex: 1 }}>
+                      {labelMap[pref.category] || pref.category}
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      {(
+                        [
+                          { key: 'enableInApp', label: 'App' },
+                          { key: 'enablePush', label: 'Push' },
+                          { key: 'enableWhatsapp', label: 'WhatsApp' },
+                        ] as const
+                      ).map((ch) => {
+                        const active = !!pref[ch.key];
+                        return (
+                          <TouchableOpacity
+                            key={ch.key}
+                            testID={`notif-pref-${pref.category}-${ch.key}`}
+                            onPress={() =>
+                              handleToggleChannelPref(
+                                pref.category as NotificationCategory,
+                                ch.key,
+                              )
+                            }
+                            style={{
+                              paddingHorizontal: 8,
+                              paddingVertical: 5,
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor: active ? theme.primary : theme.border,
+                              backgroundColor: active ? theme.primaryLight : theme.surfaceSubtle,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 10.5,
+                                fontWeight: '700',
+                                color: active ? theme.primary : theme.textMuted,
+                              }}
+                            >
+                              {active ? '✓ ' : ''}{ch.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                );
+              })}
             </View>
 
             <Button
+              testID="save-notification-settings-btn"
               title="Salvar Preferências de Notificação"
               variant="primary"
               onPress={handleSaveNotificationSettings}

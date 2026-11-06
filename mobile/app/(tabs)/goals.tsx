@@ -15,6 +15,7 @@ import { Input } from '../../src/components/Input';
 import { ScopeBadge } from '../../src/components/ScopeBadge';
 import { LoadingState } from '../../src/components/LoadingState';
 import { EmptyState } from '../../src/components/EmptyState';
+import { CalendarDatePicker } from '../../src/components/CalendarDatePicker';
 import { useGoals } from '../../src/hooks/useGoals';
 import { useTheme } from '../../src/theme/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
@@ -449,12 +450,13 @@ export default function GoalsScreen() {
                 onChangeText={setCurrentAmount}
               />
 
-              <Input
-                label="Data Alvo (Opcional - DD/MM/AAAA)"
-                placeholder="DD/MM/AAAA"
-                mask="date"
+              <CalendarDatePicker
+                testID="goal-create-date-picker"
+                label="Data Alvo (Opcional)"
+                placeholder="Escolher data no calendário"
                 value={targetDate}
-                onChangeText={setTargetDate}
+                onChange={setTargetDate}
+                outputFormat="BR"
               />
 
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
@@ -554,12 +556,13 @@ export default function GoalsScreen() {
                 onChangeText={setCurrentAmount}
               />
 
-              <Input
-                label="Data Alvo (DD/MM/AAAA)"
-                placeholder="DD/MM/AAAA"
-                mask="date"
+              <CalendarDatePicker
+                testID="goal-edit-date-picker"
+                label="Data Alvo"
+                placeholder="Escolher data no calendário"
                 value={targetDate}
-                onChangeText={setTargetDate}
+                onChange={setTargetDate}
+                outputFormat="BR"
               />
 
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>

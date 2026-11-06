@@ -6,6 +6,10 @@ import {
   CreateExpenseDto,
   UpdateExpenseDto,
   ExpenseDto,
+  SettlementPreviewDto,
+  SettlementDto,
+  CreateSettlementDto,
+  ExpenseAnalyticsDto,
 } from '../../../packages/shared/src';
 
 export function useExpenses(filters: {
@@ -89,5 +93,135 @@ export function useExpenses(filters: {
     isUpdating: updateExpenseMutation.isPending,
     deleteExpense: deleteExpenseMutation.mutateAsync,
     isDeleting: deleteExpenseMutation.isPending,
+  };
+}
+
+export function useExpenseSettlements(params: {
+  month?: string;
+  startDate?: string;
+  endDate?: string;
+  enabled?: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const enabled = params.enabled !== false;
+
+  const previewQuery = useQuery({
+    queryKey: queryKeys.expenses.settlementPreview(
+      params.startDate || params.month,
+      params.endDate,
+    ),
+    queryFn: async () => {
+      const { data } = await apiClient.get<SettlementPreviewDto>(
+        '/expenses/settlements/preview',
+        {
+          params: {
+            month: params.month,
+            startDate: params.startDate,
+            endDate: params.endDate,
+          },
+        },
+      );
+      return data;
+    },
+    enabled,
+  });
+
+  const settlementsQuery = useQuery({
+    queryKey: queryKeys.expenses.settlements(),
+    queryFn: async () => {
+      const { data } = await apiClient.get<SettlementDto[]>('/expenses/settlements');
+      return data;
+    },
+    enabled,
+  });
+
+  const createSettlementMutation = useMutation({
+    mutationFn: async (dto: CreateSettlementDto) => {
+      const { data } = await apiClient.post<SettlementDto>(
+        '/expenses/settlements',
+        dto,
+      );
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
+    },
+  });
+
+  const settleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await apiClient.patch<SettlementDto>(
+        `/expenses/settlements/${id}/settle`,
+      );
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
+    },
+  });
+
+  const reopenMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await apiClient.delete<{ success: boolean }>(
+        `/expenses/settlements/${id}`,
+      );
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+    },
+  });
+
+  return {
+    preview: previewQuery.data || null,
+    isLoadingPreview: previewQuery.isLoading,
+    settlements: settlementsQuery.data || [],
+    isLoadingSettlements: settlementsQuery.isLoading,
+    createSettlement: createSettlementMutation.mutateAsync,
+    isCreatingSettlement: createSettlementMutation.isPending,
+    settleAccountClosing: settleMutation.mutateAsync,
+    isSettling: settleMutation.isPending,
+    reopenSettlement: reopenMutation.mutateAsync,
+    isReopening: reopenMutation.isPending,
+  };
+}
+
+export function useExpenseAnalytics(params: {
+  month?: string;
+  startDate?: string;
+  endDate?: string;
+  scope?: string;
+  enabled?: boolean;
+}) {
+  const enabled = params.enabled !== false;
+
+  const analyticsQuery = useQuery({
+    queryKey: queryKeys.expenses.analytics(
+      params.startDate || params.month,
+      params.endDate,
+    ),
+    queryFn: async () => {
+      const { data } = await apiClient.get<ExpenseAnalyticsDto>(
+        '/expenses/analytics',
+        {
+          params: {
+            month: params.month,
+            startDate: params.startDate,
+            endDate: params.endDate,
+            scope: params.scope,
+          },
+        },
+      );
+      return data;
+    },
+    enabled,
+  });
+
+  return {
+    analytics: analyticsQuery.data || null,
+    isLoadingAnalytics: analyticsQuery.isLoading,
+    refetchAnalytics: analyticsQuery.refetch,
   };
 }

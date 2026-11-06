@@ -13,18 +13,39 @@ export const authService = {
   async register(dto: RegisterDto): Promise<AuthResponseDto> {
     const { data } = await apiClient.post<AuthResponseDto>('/auth/register', dto);
     await tokenStorage.setToken(data.accessToken);
+    if (data.refreshToken) {
+      await tokenStorage.setRefreshToken(data.refreshToken);
+    }
     return data;
   },
 
   async login(dto: LoginDto): Promise<AuthResponseDto> {
     const { data } = await apiClient.post<AuthResponseDto>('/auth/login', dto);
     await tokenStorage.setToken(data.accessToken);
+    if (data.refreshToken) {
+      await tokenStorage.setRefreshToken(data.refreshToken);
+    }
     return data;
   },
 
   async googleAuth(dto: GoogleAuthDto): Promise<AuthResponseDto> {
     const { data } = await apiClient.post<AuthResponseDto>('/auth/google', dto);
     await tokenStorage.setToken(data.accessToken);
+    if (data.refreshToken) {
+      await tokenStorage.setRefreshToken(data.refreshToken);
+    }
+    return data;
+  },
+
+  async refresh(): Promise<AuthResponseDto> {
+    const refreshToken = await tokenStorage.getRefreshToken();
+    const { data } = await apiClient.post<AuthResponseDto>('/auth/refresh', {
+      refreshToken,
+    });
+    await tokenStorage.setToken(data.accessToken);
+    if (data.refreshToken) {
+      await tokenStorage.setRefreshToken(data.refreshToken);
+    }
     return data;
   },
 
@@ -39,6 +60,11 @@ export const authService = {
   },
 
   async getMe() {
+    const token = await tokenStorage.getToken();
+    const refreshToken = await tokenStorage.getRefreshToken();
+    if (!token && !refreshToken) {
+      return null;
+    }
     const { data } = await apiClient.get('/auth/me');
     return data;
   },
@@ -54,6 +80,11 @@ export const authService = {
   },
 
   async logout(): Promise<void> {
-    await tokenStorage.clearToken();
+    try {
+      const refreshToken = await tokenStorage.getRefreshToken();
+      await apiClient.post('/auth/logout', { refreshToken }).catch(() => {});
+    } finally {
+      await tokenStorage.clearToken();
+    }
   },
 };

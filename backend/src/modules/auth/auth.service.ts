@@ -7,7 +7,9 @@ import {
   Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
 import axios from 'axios';
 import { MailService } from '../mail/mail.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
@@ -19,6 +21,7 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
   UpdateProfileDto,
+  RefreshTokenDto,
 } from '../../../../packages/shared/src';
 
 @Injectable()
@@ -28,9 +31,167 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private configService: ConfigService,
     private mailService: MailService,
     private whatsappService: WhatsappService,
   ) {}
+
+  private get refreshSecret(): string {
+    return (
+      this.configService.get<string>('JWT_REFRESH_SECRET') ||
+      (this.configService.get<string>('JWT_SECRET') || 'nexo-secret-key-fallback') + '-refresh'
+    );
+  }
+
+  private async issueTokenPair(user: { id: string; email: string }, userAgent?: string) {
+    const accessToken = await this.jwtService.signAsync({
+      sub: user.id,
+      email: user.email,
+    });
+
+    const tokenId = randomUUID();
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 dias
+
+    const refreshToken = await this.jwtService.signAsync(
+      {
+        sub: user.id,
+        email: user.email,
+        jti: tokenId,
+        type: 'refresh',
+      },
+      {
+        secret: this.refreshSecret,
+        expiresIn: '30d',
+      },
+    );
+
+    const tokenHash = await bcrypt.hash(refreshToken, 10);
+
+    await this.prisma.refreshToken.create({
+      data: {
+        id: tokenId,
+        tokenHash,
+        userId: user.id,
+        expiresAt,
+        userAgent,
+      },
+    });
+
+    return { accessToken, refreshToken, tokenId };
+  }
+
+  async refreshTokens(dto: RefreshTokenDto, userAgent?: string) {
+    if (!dto?.refreshToken) {
+      throw new UnauthorizedException('Refresh token ausente');
+    }
+
+    let payload: { sub: string; email: string; jti?: string; type?: string };
+    try {
+      payload = await this.jwtService.verifyAsync(dto.refreshToken, {
+        secret: this.refreshSecret,
+      });
+    } catch {
+      throw new UnauthorizedException('Refresh token inválido ou expirado');
+    }
+
+    if (!payload?.sub || !payload?.jti || payload.type !== 'refresh') {
+      throw new UnauthorizedException('Payload de refresh token inválido');
+    }
+
+    const storedToken = await this.prisma.refreshToken.findUnique({
+      where: { id: payload.jti },
+    });
+
+    if (!storedToken) {
+      throw new UnauthorizedException('Sessão não encontrada');
+    }
+
+    // Detecção de reuso de Refresh Token já revogado: revoga toda a família de sessões do usuário
+    if (storedToken.revokedAt) {
+      this.logger.warn(`Detecção de reuso de refresh token revogado para usuário ${payload.sub}. Revogando sessões.`);
+      await this.prisma.refreshToken.updateMany({
+        where: { userId: payload.sub, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      throw new UnauthorizedException('Sessão expirada por segurança. Faça login novamente.');
+    }
+
+    if (new Date() > storedToken.expiresAt) {
+      await this.prisma.refreshToken.update({
+        where: { id: storedToken.id },
+        data: { revokedAt: new Date() },
+      });
+      throw new UnauthorizedException('Refresh token expirado');
+    }
+
+    const isHashValid = await bcrypt.compare(dto.refreshToken, storedToken.tokenHash);
+    if (!isHashValid) {
+      throw new UnauthorizedException('Assinatura de refresh token inválida');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Usuário não encontrado');
+    }
+
+    // Rotação: gera novo par e revoga o anterior apontando para o substituto
+    const { accessToken, refreshToken, tokenId: newTokenId } = await this.issueTokenPair(
+      { id: user.id, email: user.email },
+      userAgent,
+    );
+
+    await this.prisma.refreshToken.update({
+      where: { id: storedToken.id },
+      data: {
+        revokedAt: new Date(),
+        replacedByTokenId: newTokenId,
+      },
+    });
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        phoneNumber: user.phoneNumber,
+        householdId: user.householdId,
+        avatarUrl: user.avatarUrl,
+        googleAccessToken: user.googleAccessToken,
+        sharePrivateExpenses: user.sharePrivateExpenses,
+      },
+    };
+  }
+
+  async logout(userId: string, refreshToken?: string) {
+    if (refreshToken) {
+      try {
+        const payload = await this.jwtService.verifyAsync(refreshToken, {
+          secret: this.refreshSecret,
+        });
+        if (payload?.jti) {
+          await this.prisma.refreshToken.updateMany({
+            where: { id: payload.jti, userId },
+            data: { revokedAt: new Date() },
+          });
+          return { success: true };
+        }
+      } catch {
+        // Ignora erro de parse no logout e revoga tokens ativos do usuário
+      }
+    }
+
+    await this.prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
+    return { success: true };
+  }
 
   async register(dto: RegisterDto) {
     const existing = await this.prisma.user.findUnique({
@@ -60,8 +221,8 @@ export class AuthService {
       },
     });
 
-    const accessToken = this.jwtService.sign({
-      sub: user.id,
+    const { accessToken, refreshToken } = await this.issueTokenPair({
+      id: user.id,
       email: user.email,
     });
 
@@ -72,6 +233,7 @@ export class AuthService {
 
     return {
       accessToken,
+      refreshToken,
       user: {
         id: user.id,
         email: user.email,
@@ -104,8 +266,8 @@ export class AuthService {
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
-    const accessToken = this.jwtService.sign({
-      sub: user.id,
+    const { accessToken, refreshToken } = await this.issueTokenPair({
+      id: user.id,
       email: user.email,
     });
 
@@ -116,6 +278,7 @@ export class AuthService {
 
     return {
       accessToken,
+      refreshToken,
       user: {
         id: user.id,
         email: user.email,
@@ -219,8 +382,8 @@ export class AuthService {
       this.logger.log(`Novo usuário criado via Google: ${email}`);
     }
 
-    const accessToken = this.jwtService.sign({
-      sub: user.id,
+    const { accessToken, refreshToken } = await this.issueTokenPair({
+      id: user.id,
       email: user.email,
     });
 
@@ -231,6 +394,7 @@ export class AuthService {
 
     return {
       accessToken,
+      refreshToken,
       user: {
         id: user.id,
         email: user.email,
@@ -323,6 +487,9 @@ export class AuthService {
         enableDailySummary: true,
         periodicSummaryType: true,
         periodicSummaryDay: true,
+        periodicSummaryTime: true,
+        timezone: true,
+        expoPushToken: true,
         googleAccessToken: true,
         sharePrivateExpenses: true,
         household: {
@@ -366,6 +533,9 @@ export class AuthService {
         ...(data.enableDailySummary !== undefined && { enableDailySummary: data.enableDailySummary }),
         ...(data.periodicSummaryType !== undefined && { periodicSummaryType: data.periodicSummaryType }),
         ...(data.periodicSummaryDay !== undefined && { periodicSummaryDay: data.periodicSummaryDay }),
+        ...(data.periodicSummaryTime !== undefined && { periodicSummaryTime: data.periodicSummaryTime }),
+        ...(data.timezone !== undefined && { timezone: data.timezone }),
+        ...(data.expoPushToken !== undefined && { expoPushToken: data.expoPushToken }),
         ...(data.googleAccessToken !== undefined && { googleAccessToken: data.googleAccessToken }),
         ...(data.sharePrivateExpenses !== undefined && { sharePrivateExpenses: data.sharePrivateExpenses }),
       },
@@ -380,6 +550,9 @@ export class AuthService {
         enableDailySummary: true,
         periodicSummaryType: true,
         periodicSummaryDay: true,
+        periodicSummaryTime: true,
+        timezone: true,
+        expoPushToken: true,
         googleAccessToken: true,
         sharePrivateExpenses: true,
       },
