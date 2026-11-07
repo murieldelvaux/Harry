@@ -8,20 +8,48 @@ const LEGACY_TOKEN_KEY = 'nexo_auth_token';
 const REFRESH_TOKEN_KEY = 'harry_refresh_token';
 const LEGACY_REFRESH_TOKEN_KEY = 'nexo_refresh_token';
 
-// Usa localhost:3000 quando rodando em localhost na Web, ou variável de ambiente do Expo
-const isLocalWeb =
-  Platform.OS === 'web' &&
-  typeof window !== 'undefined' &&
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+// Resolve a URL base da API de forma inteligente para Web, Emulador e Dispositivo Físico no Expo Go
+function resolveBaseUrl(): string {
+  // 1. Se for Web no navegador
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return 'http://localhost:3000/api/v1';
+    }
+    // Web acessado pelo celular no IP da rede local (ex: http://192.168.0.129:8081)
+    if (host && !process.env.EXPO_PUBLIC_API_URL?.includes('onrender.com')) {
+      return `http://${host}:3000/api/v1`;
+    }
+  }
 
-const rawUrl = isLocalWeb
-  ? 'http://localhost:3000/api/v1'
-  : process.env.EXPO_PUBLIC_API_URL ||
-    Constants.expoConfig?.extra?.apiUrl ||
-    'http://localhost:3000/api/v1';
+  // 2. Se for dispositivo móvel nativo (iOS / Android no Expo Go)
+  let apiUrl = process.env.EXPO_PUBLIC_API_URL || (Constants.expoConfig?.extra as any)?.apiUrl;
 
-const cleanUrl = rawUrl.replace(/\/+$/, '');
-const BASE_URL = cleanUrl.endsWith('/api/v1') ? cleanUrl : `${cleanUrl}/api/v1`;
+  const hostUri =
+    Constants.expoConfig?.hostUri ||
+    (Constants as any).manifest?.debuggerHost ||
+    (Constants as any).manifest2?.extra?.expoClient?.hostUri;
+
+  const devIp = hostUri ? hostUri.split(':')[0] : null;
+
+  // Em dispositivo físico no Expo Go, "localhost" ou "127.0.0.1" aponta para o próprio celular!
+  // Substituímos automaticamente pelo IP da máquina host de desenvolvimento (ex: 192.168.0.129)
+  if (Platform.OS !== 'web' && devIp && (!apiUrl || apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1'))) {
+    apiUrl = `http://${devIp}:3000/api/v1`;
+  }
+
+  if (!apiUrl) {
+    apiUrl = 'http://localhost:3000/api/v1';
+  }
+
+  const clean = apiUrl.replace(/\/+$/, '');
+  return clean.endsWith('/api/v1') ? clean : `${clean}/api/v1`;
+}
+
+const BASE_URL = resolveBaseUrl();
+if (__DEV__) {
+  console.log(`[Harry API] Conectando ao backend em: ${BASE_URL}`);
+}
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,

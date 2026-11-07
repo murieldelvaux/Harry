@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
+import { ResponseType } from 'expo-auth-session';
 import { useAuth } from './useAuth';
 import { useCalendar } from './useCalendar';
 
@@ -20,6 +21,7 @@ export function useGoogleCalendarAuth() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const [request, response, promptAsync] = Google.useAuthRequest({
+    responseType: ResponseType.Token,
     webClientId: WEB_ID || 'not-configured',
     iosClientId: IOS_ID || WEB_ID || 'not-configured',
     androidClientId: ANDROID_ID || WEB_ID || 'not-configured',
@@ -38,7 +40,9 @@ export function useGoogleCalendarAuth() {
 
     if (response.type === 'success') {
       const accessToken =
-        response.authentication?.accessToken || response.params?.access_token;
+        response.authentication?.accessToken ||
+        response.params?.access_token ||
+        (response as any).params?.id_token;
 
       if (accessToken) {
         setIsConnecting(true);

@@ -310,20 +310,61 @@ export class AuthService {
       .filter(Boolean);
 
     try {
-      // 1. Obter informações de perfil diretamente do endpoint oficial do Google userinfo
-      const { data: profile } = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      let profile: any = null;
+
+      // 1. Suporta idToken (formato JWT com 3 partes: eyJ...)
+      if (accessToken.startsWith('eyJ') && accessToken.split('.').length === 3) {
+        try {
+          const { data: idTokenInfo } = await axios.get('https://oauth2.googleapis.com/tokeninfo', {
+            params: { id_token: accessToken },
+            timeout: 8000,
+          });
+          profile = {
+            sub: idTokenInfo.sub,
+            email: idTokenInfo.email,
+            email_verified: idTokenInfo.email_verified === 'true' || idTokenInfo.email_verified === true,
+            name: idTokenInfo.name || idTokenInfo.email?.split('@')[0],
+            picture: idTokenInfo.picture,
+          };
+        } catch (idErr: any) {
+          this.logger.warn(`Validação via id_token falhou, tentando userinfo...: ${idErr?.message}`);
+        }
+      }
+
+      // 2. Se não foi validado como idToken, obter informações de perfil do endpoint userinfo (Bearer accessToken)
+      if (!profile) {
+        try {
+          const { data: userinfo } = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${accessToken}` },
+            timeout: 8000,
+          });
+          profile = userinfo;
+        } catch (userinfoErr: any) {
+          // Fallback final: tokeninfo via access_token
+          const { data: tokeninfo } = await axios.get('https://oauth2.googleapis.com/tokeninfo', {
+            params: { access_token: accessToken },
+            timeout: 8000,
+          });
+          profile = {
+            sub: tokeninfo.sub || tokeninfo.user_id,
+            email: tokeninfo.email,
+            email_verified: tokeninfo.email_verified === 'true' || tokeninfo.email_verified === true,
+            name: tokeninfo.email?.split('@')[0],
+            picture: undefined,
+          };
+        }
+      }
 
       if (!profile || !profile.email || profile.email_verified === false) {
         throw new UnauthorizedException('E-mail do Google não verificado ou inválido.');
       }
 
-      // 2. Se houver allowed configurado, verificar audience no tokeninfo
+      // 3. Se houver allowed configurado, verificar audience no tokeninfo
       if (allowed.length > 0) {
         try {
           const { data: info } = await axios.get('https://oauth2.googleapis.com/tokeninfo', {
             params: { access_token: accessToken },
+            timeout: 5000,
           });
           if (info && (info.aud || info.azp)) {
             const tokenAud = (info.aud || info.azp || '').trim();
