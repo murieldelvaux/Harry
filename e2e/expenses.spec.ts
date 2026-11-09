@@ -156,4 +156,50 @@ test.describe('Financeiro & Lançamentos (Expenses)', () => {
     await page.getByTestId('next-month-btn').click();
     await expect(page.getByText(/2\/2/).first()).toBeVisible();
   });
+
+  test('não deve decrementar a data no calendário ao editar ou selecionar dia X', async ({ page }) => {
+    // Abre modal de criação
+    await page.locator("text=+ Novo Lançamento").or(page.locator("text=Novo Lançamento")).first().click();
+    await expect(page.getByText(/Novo Gasto \(Saída\)/i).first()).toBeVisible();
+
+    await page.locator("input[placeholder*='Supermercado']:visible").fill('Compra Teste Data');
+    await page.locator("input[placeholder*='0,00']:visible").fill('150.00');
+
+    // Abre o date picker de criação
+    await page.getByTestId('expense-create-date-picker').click();
+    await expect(page.getByTestId('expense-create-date-picker-modal')).toBeVisible();
+
+    // Clica no dia 15
+    await page.getByTestId('expense-create-date-picker-day-15').click();
+    await page.getByText('Confirmar').click();
+
+    // Salva o gasto
+    await page.getByText('Salvar Gasto').first().click();
+
+    // Card deve exibir dia 15 (e não 14)
+    await expect(page.getByText('Compra Teste Data').first()).toBeVisible();
+    await expect(page.getByText(/15 de/i).first()).toBeVisible();
+
+    // Abre modal de edição
+    await page.locator('text=✏️').first().click();
+    await expect(page.getByText(/Editar Gasto/i).first()).toBeVisible();
+
+    // Abre date picker de edição para checar se o dia 15 segue selecionado
+    await page.getByTestId('expense-edit-date-picker').click();
+    await expect(page.getByTestId('expense-edit-date-picker-modal')).toBeVisible();
+    await expect(page.getByText(/15\/\d{2}\/\d{4}/).first()).toBeVisible();
+    await page.getByText('Confirmar').click();
+
+    // Salva sem alterar a data
+    await page.getByText('Salvar Alterações').first().click();
+
+    // Card deve continuar exibindo dia 15 (não deve decrementar para 14)
+    await expect(page.getByText(/15 de/i).first()).toBeVisible();
+
+    // Abre e salva uma segunda vez para garantir estabilidade idempotente
+    await page.locator('text=✏️').first().click();
+    await expect(page.getByText(/Editar Gasto/i).first()).toBeVisible();
+    await page.getByText('Salvar Alterações').first().click();
+    await expect(page.getByText(/15 de/i).first()).toBeVisible();
+  });
 });

@@ -23,7 +23,16 @@ import { AppHeader } from '../../src/components/AppHeader';
 import { useExpenses, useExpenseSettlements, useExpenseAnalytics } from '../../src/hooks/useExpenses';
 import { useHousehold } from '../../src/hooks/useHousehold';
 import { useAuth } from '../../src/hooks/useAuth';
-import { formatCurrency, formatDate, getCategoryLabel, maskCurrency, unmaskCurrency, maskDate } from '../../src/utils/format';
+import {
+  formatCurrency,
+  formatDate,
+  getCategoryLabel,
+  maskCurrency,
+  unmaskCurrency,
+  maskDate,
+  parseIsoToBrDate,
+  parseBrDateToIso,
+} from '../../src/utils/format';
 import { ExpenseCategory, RecordScope, TransactionType, ExpenseDto, SettlementStatus } from '../../../packages/shared/src';
 
 const MONTH_NAMES = [
@@ -50,6 +59,14 @@ const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   ExpenseCategory.LEISURE,
   ExpenseCategory.OTHER,
 ];
+
+const getTodayBrDate = () => {
+  const now = new Date();
+  const d = String(now.getDate()).padStart(2, '0');
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const y = now.getFullYear();
+  return `${d}/${m}/${y}`;
+};
 
 export default function ExpensesScreen() {
   const { theme, isDark } = useTheme();
@@ -261,9 +278,7 @@ export default function ExpensesScreen() {
     setCategory(item.category);
     setScope(item.scope);
     setPaidByUserId(item.paidByUserId || item.userId || user?.id || '');
-    const d = new Date(item.date);
-    const formattedD = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-    setCustomDate(maskDate(formattedD));
+    setCustomDate(parseIsoToBrDate(item.date));
     setEditModalVisible(true);
   };
 
@@ -275,11 +290,7 @@ export default function ExpensesScreen() {
       return;
     }
 
-    let isoDate: string | undefined = undefined;
-    if (customDate) {
-      const parsed = parseDateInput(customDate);
-      if (parsed) isoDate = new Date(parsed).toISOString();
-    }
+    const isoDate = parseBrDateToIso(customDate) || parseBrDateToIso(getTodayBrDate());
 
     try {
       await createExpense({
@@ -309,11 +320,7 @@ export default function ExpensesScreen() {
       return;
     }
 
-    let isoDate: string | undefined = undefined;
-    if (customDate) {
-      const parsed = parseDateInput(customDate);
-      if (parsed) isoDate = new Date(parsed).toISOString();
-    }
+    const isoDate = parseBrDateToIso(customDate);
 
     try {
       await updateExpense({

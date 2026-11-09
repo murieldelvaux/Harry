@@ -23,6 +23,22 @@ import {
   MemberSettlementBreakdownDto,
 } from '../../../../packages/shared/src';
 
+/**
+ * Calcula a data de uma parcela de forma determinística em UTC ao meio-dia (12:00:00.000Z),
+ * garantindo imunidade a fusos horários locais e ajuste exato aos dias válidos do mês alvo.
+ */
+export function calculateInstallmentDate(baseDate: Date, installmentIndex: number): Date {
+  const baseYear = baseDate.getUTCFullYear();
+  const baseMonth = baseDate.getUTCMonth();
+  const baseDay = baseDate.getUTCDate();
+  const totalMonths = baseMonth + installmentIndex;
+  const targetYear = baseYear + Math.floor(totalMonths / 12);
+  const targetMonth = totalMonths % 12;
+  const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  const targetDay = Math.min(baseDay, daysInTargetMonth);
+  return new Date(Date.UTC(targetYear, targetMonth, targetDay, 12, 0, 0, 0));
+}
+
 @Injectable()
 export class ExpensesService {
   constructor(
@@ -60,12 +76,7 @@ export class ExpensesService {
       const createdExpenses = [];
 
       for (let i = 1; i <= N; i++) {
-        const instDate = new Date(baseDate.getTime());
-        const originalDay = baseDate.getDate();
-        instDate.setMonth(baseDate.getMonth() + (i - 1));
-        if (instDate.getDate() !== originalDay) {
-          instDate.setDate(0);
-        }
+        const instDate = calculateInstallmentDate(baseDate, i - 1);
 
         const currentAmount = i === 1 ? (baseInstallmentAmount + remainder) : baseInstallmentAmount;
         const currentDesc = dto.description.includes('(')
@@ -939,7 +950,22 @@ export class ExpensesService {
 
       const rawDesc = dto.description !== undefined ? dto.description.trim() : existing.description;
       const baseDesc = rawDesc.replace(/\s*\(\d+\/\d+\)$/, '').trim();
-      const baseDate = dto.date ? new Date(dto.date) : new Date(existing.date);
+
+      let baseDate: Date;
+      if (dto.date) {
+        baseDate = new Date(dto.date);
+      } else if (existing.installmentGroupId && existing.installmentNumber && existing.installmentNumber > 1) {
+        const firstSibling = await this.prisma.expense.findFirst({
+          where: {
+            installmentGroupId: existing.installmentGroupId,
+            installmentNumber: 1,
+          },
+        });
+        baseDate = firstSibling ? new Date(firstSibling.date) : new Date(existing.date);
+      } else {
+        baseDate = new Date(existing.date);
+      }
+
       const effectivePaidByUserId = dto.paidByUserId !== undefined ? dto.paidByUserId : existing.paidByUserId;
       const effectiveScope = dto.scope !== undefined ? dto.scope : existing.scope;
       const effectiveType = dto.type !== undefined ? dto.type : existing.type;
@@ -967,7 +993,7 @@ export class ExpensesService {
           scope: (effectiveScope as any) || RecordScope.PRIVATE,
           paidByUserId: effectivePaidByUserId,
           householdId,
-          date: baseDate,
+          date: calculateInstallmentDate(baseDate, 0),
           installmentGroupId,
           installmentNumber: 1,
           totalInstallments: N,
@@ -979,12 +1005,7 @@ export class ExpensesService {
       });
 
       for (let i = 2; i <= N; i++) {
-        const instDate = new Date(baseDate.getTime());
-        const originalDay = baseDate.getDate();
-        instDate.setMonth(baseDate.getMonth() + (i - 1));
-        if (instDate.getDate() !== originalDay) {
-          instDate.setDate(0);
-        }
+        const instDate = calculateInstallmentDate(baseDate, i - 1);
 
         const nextExp = await this.prisma.expense.create({
           data: {

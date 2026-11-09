@@ -1,6 +1,18 @@
 import { Page } from '@playwright/test';
 import { RecordScope, TransactionType, GoalStatus } from '../../packages/shared/src';
 
+function calculateInstallmentDate(baseDate: Date, installmentIndex: number): Date {
+  const baseYear = baseDate.getUTCFullYear();
+  const baseMonth = baseDate.getUTCMonth();
+  const baseDay = baseDate.getUTCDate();
+  const totalMonths = baseMonth + installmentIndex;
+  const targetYear = baseYear + Math.floor(totalMonths / 12);
+  const targetMonth = totalMonths % 12;
+  const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  const targetDay = Math.min(baseDay, daysInTargetMonth);
+  return new Date(Date.UTC(targetYear, targetMonth, targetDay, 12, 0, 0, 0));
+}
+
 export interface MockUser {
   id: string;
   name: string;
@@ -435,8 +447,7 @@ export async function setupMockApi(page: Page, options: SetupMockApiOptions = {}
 
         const createdList = [];
         for (let i = 1; i <= N; i++) {
-          const instDate = new Date(baseDate.getTime());
-          instDate.setMonth(baseDate.getMonth() + (i - 1));
+          const instDate = calculateInstallmentDate(baseDate, i - 1);
           const currentAmount = i === 1 ? baseInstallmentAmount + remainder : baseInstallmentAmount;
           const currentDesc = body.description.includes('(') ? body.description : `${body.description} (${i}/${N})`;
 
@@ -499,15 +510,14 @@ export async function setupMockApi(page: Page, options: SetupMockApiOptions = {}
           ...body,
           description: `${baseDesc} (1/${N})`,
           amount: firstInstallmentAmount,
-          date: baseDate.toISOString(),
+          date: calculateInstallmentDate(baseDate, 0).toISOString(),
           installmentGroupId,
           installmentNumber: 1,
           totalInstallments: N,
         });
 
         for (let i = 2; i <= N; i++) {
-          const instDate = new Date(baseDate.getTime());
-          instDate.setMonth(baseDate.getMonth() + (i - 1));
+          const instDate = calculateInstallmentDate(baseDate, i - 1);
           const item = {
             ...existing,
             id: `exp-inst-${Date.now()}-${i}`,
