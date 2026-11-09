@@ -90,4 +90,46 @@ test.describe('Financeiro & Lançamentos (Expenses)', () => {
     // Item não deve mais estar visível
     await expect(page.getByText('Supermercado Mensal')).not.toBeVisible();
   });
+
+  test('deve lançar gasto parcelado e exibir parcelas nos meses seguintes', async ({ page }) => {
+    // Abre modal de criação
+    await page.locator("text=+ Novo Lançamento").or(page.locator("text=Novo Lançamento")).first().click();
+    await expect(page.getByText(/Novo Gasto \(Saída\)/i).first()).toBeVisible();
+
+    // Preenche descrição e valor total
+    await page.locator("input[placeholder*='Supermercado']:visible").fill('Smartphone Novo');
+    await page.locator("input[placeholder*='0,00']:visible").fill('900.00');
+
+    // Clica no toggle de Compra Parcelada
+    await page.getByTestId('toggle-installment-btn').click();
+    await expect(page.getByText(/Número de Parcelas/i).first()).toBeVisible();
+
+    // Seleciona 3 parcelas
+    await page.getByTestId('installment-chip-3').click();
+
+    // Verifica prévia do cálculo da simulação: 3 parcelas de R$ 300,00
+    await expect(page.getByTestId('installment-preview-box')).toBeVisible();
+    await expect(page.getByText(/3 parcelas de R\$\s*300,00/i).first()).toBeVisible();
+
+    // Salva o gasto parcelado
+    await page.getByText('Salvar Gasto').first().click();
+
+    // Mês 1 (Atual): Deve exibir a parcela 1/3
+    await expect(page.getByText(/Smartphone Novo/i).first()).toBeVisible();
+    await expect(page.getByText(/1\/3/).first()).toBeVisible();
+
+    // Navega para o próximo mês
+    await page.getByTestId('next-month-btn').click();
+
+    // Mês 2: Deve exibir a parcela 2/3
+    await expect(page.getByText(/Smartphone Novo/i).first()).toBeVisible();
+    await expect(page.getByText(/2\/3/).first()).toBeVisible();
+
+    // Navega para o próximo mês
+    await page.getByTestId('next-month-btn').click();
+
+    // Mês 3: Deve exibir a parcela 3/3
+    await expect(page.getByText(/Smartphone Novo/i).first()).toBeVisible();
+    await expect(page.getByText(/3\/3/).first()).toBeVisible();
+  });
 });

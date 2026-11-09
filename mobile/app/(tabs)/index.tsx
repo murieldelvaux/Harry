@@ -487,6 +487,14 @@ export default function DashboardScreen() {
                       <Text style={[styles.expenseDateText, { color: theme.textMuted }]}>
                         {formatDate(item.date)}
                       </Text>
+                      {item.totalInstallments && item.totalInstallments > 1 ? (
+                        <>
+                          <Text style={[styles.expenseDot, { color: theme.textMuted }]}>•</Text>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: isDark ? '#A78BFA' : '#6D28D9' }}>
+                            💳 {item.installmentNumber}/{item.totalInstallments}
+                          </Text>
+                        </>
+                      ) : null}
                     </View>
                   </View>
 

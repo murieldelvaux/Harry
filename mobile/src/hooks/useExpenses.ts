@@ -54,8 +54,12 @@ export function useExpenses(filters: {
   });
 
   const deleteExpenseMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await apiClient.delete(`/expenses/${id}`);
+    mutationFn: async (arg: string | { id: string; deleteAll?: boolean }) => {
+      const id = typeof arg === 'string' ? arg : arg.id;
+      const deleteAll = typeof arg === 'object' ? arg.deleteAll : false;
+      await apiClient.delete(`/expenses/${id}`, {
+        params: deleteAll ? { deleteAll: 'true' } : undefined,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });

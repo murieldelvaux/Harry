@@ -112,7 +112,8 @@ export class ExpensesController {
   async delete(
     @CurrentUser('userId') userId: string,
     @Param('id') id: string,
+    @Query('deleteAll') deleteAll?: string,
   ) {
-    return this.expensesService.delete(id, userId);
+    return this.expensesService.delete(id, userId, deleteAll === 'true');
   }
 }

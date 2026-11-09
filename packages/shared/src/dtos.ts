@@ -173,6 +173,7 @@ export const CreateExpenseDtoSchema = z.object({
   date: z.string().optional(), // ISO date string
   rawSource: z.string().optional(),
   paidByUserId: z.string().optional(),
+  totalInstallments: z.number().int().min(1).max(120).optional(),
 });
 export type CreateExpenseDto = z.infer<typeof CreateExpenseDtoSchema>;
 
@@ -196,6 +197,9 @@ export interface ExpenseDto {
   } | null;
   settlementId?: string | null;
   householdId: string | null;
+  installmentGroupId?: string | null;
+  installmentNumber?: number | null;
+  totalInstallments?: number | null;
   author: {
     id: string;
     name: string;
