@@ -5,3 +5,4 @@ ADD COLUMN "totalInstallments" INTEGER;
 
 -- CreateIndex
 CREATE INDEX "Expense_installmentGroupId_idx" ON "Expense"("installmentGroupId");
+

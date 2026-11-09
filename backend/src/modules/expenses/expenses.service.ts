@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeService } from '../../common/realtime/realtime.service';
@@ -45,6 +46,93 @@ export class ExpensesService {
       dto.scope === RecordScope.SHARED && dto.paidByUserId
         ? dto.paidByUserId
         : userId;
+
+    const isInstallment = dto.totalInstallments && dto.totalInstallments > 1;
+
+    if (isInstallment) {
+      const N = dto.totalInstallments!;
+      const totalAmount = Number(dto.amount);
+      const baseInstallmentAmount = Math.floor((totalAmount / N) * 100) / 100;
+      const remainder = Math.round((totalAmount - (baseInstallmentAmount * N)) * 100) / 100;
+      const installmentGroupId = randomUUID();
+      const baseDate = dto.date ? new Date(dto.date) : new Date();
+
+      const createdExpenses = [];
+
+      for (let i = 1; i <= N; i++) {
+        const instDate = new Date(baseDate.getTime());
+        const originalDay = baseDate.getDate();
+        instDate.setMonth(baseDate.getMonth() + (i - 1));
+        if (instDate.getDate() !== originalDay) {
+          instDate.setDate(0);
+        }
+
+        const currentAmount = i === 1 ? (baseInstallmentAmount + remainder) : baseInstallmentAmount;
+        const currentDesc = dto.description.includes('(')
+          ? dto.description
+          : `${dto.description} (${i}/${N})`;
+
+        const exp = await this.prisma.expense.create({
+          data: {
+            description: currentDesc,
+            amount: currentAmount,
+            type: (dto.type as any) || TransactionType.EXPENSE,
+            category: (dto.category as any) || ExpenseCategory.OTHER,
+            scope: (dto.scope as any) || RecordScope.PRIVATE,
+            date: instDate,
+            rawSource: dto.rawSource || 'manual_app',
+            userId,
+            paidByUserId: effectivePaidByUserId,
+            householdId: dto.scope === RecordScope.SHARED ? user?.householdId : null,
+            installmentGroupId,
+            installmentNumber: i,
+            totalInstallments: N,
+          },
+          include: {
+            user: { select: { id: true, name: true } },
+            paidBy: { select: { id: true, name: true } },
+          },
+        });
+
+        createdExpenses.push(exp);
+
+        this.realtimeService.emit({
+          type: 'EXPENSE_CREATED',
+          userId,
+          householdId: exp.householdId,
+          data: this.mapExpense(exp),
+        });
+      }
+
+      if (dto.scope === RecordScope.SHARED && user?.householdId) {
+        const formattedTotal = totalAmount.toLocaleString('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        });
+        const formattedParcel = baseInstallmentAmount.toLocaleString('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        });
+        const payerName = createdExpenses[0].paidBy?.name || user?.name || 'Seu par';
+
+        await this.notificationsService.notifyHouseholdPartners({
+          actorUserId: userId,
+          householdId: user.householdId,
+          type: NotificationType.SHARED_EXPENSE_CREATED,
+          title: '💳 Nova Compra Parcelada Lançada',
+          body: `${user?.name || 'Seu par'} lançou "${dto.description}" parcelado em ${N}x de ~${formattedParcel} (Total: ${formattedTotal}) — Pago por: ${payerName}.`,
+          deepLink: '/(tabs)/expenses',
+          metadata: {
+            installmentGroupId,
+            totalInstallments: N,
+            amount: totalAmount,
+            paidByUserId: effectivePaidByUserId,
+          },
+        });
+      }
+
+      return this.mapExpense(createdExpenses[0]);
+    }
 
     const expense = await this.prisma.expense.create({
       data: {
@@ -868,11 +956,18 @@ export class ExpensesService {
     return this.mapExpense(updated);
   }
 
-  async delete(id: string, userId: string) {
+  async delete(id: string, userId: string, deleteAllInstallments?: boolean) {
     const existing = await this.findOne(id, userId);
 
     if (existing.scope === RecordScope.PRIVATE && existing.userId !== userId) {
       throw new ForbiddenException('Apenas o autor pode excluir este gasto pessoal');
+    }
+
+    if (deleteAllInstallments && (existing as any).installmentGroupId) {
+      await this.prisma.expense.deleteMany({
+        where: { installmentGroupId: (existing as any).installmentGroupId },
+      });
+      return { success: true };
     }
 
     await this.prisma.expense.delete({ where: { id } });
@@ -900,9 +995,12 @@ export class ExpensesService {
       paidBy: paidByObj,
       settlementId: exp.settlementId || null,
       householdId: exp.householdId,
+      installmentGroupId: exp.installmentGroupId || null,
+      installmentNumber: exp.installmentNumber || null,
+      totalInstallments: exp.totalInstallments || null,
       author: {
-        id: exp.user.id,
-        name: exp.user.name,
+        id: exp.user ? exp.user.id : exp.userId,
+        name: exp.user ? exp.user.name : 'Usuário',
       },
       createdAt: exp.createdAt.toISOString(),
       updatedAt: exp.updatedAt.toISOString(),
