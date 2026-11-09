@@ -132,4 +132,28 @@ test.describe('Financeiro & Lançamentos (Expenses)', () => {
     await expect(page.getByText(/Smartphone Novo/i).first()).toBeVisible();
     await expect(page.getByText(/3\/3/).first()).toBeVisible();
   });
+
+  test('deve permitir editar um gasto existente para torná-lo parcelado', async ({ page }) => {
+    // Localiza e clica para editar o primeiro item ("Supermercado Mensal")
+    await page.locator('text=✏️').first().click();
+    await expect(page.getByText(/Editar Gasto/i).first()).toBeVisible();
+
+    // Clica no toggle de Compra Parcelada na edição
+    await page.getByTestId('edit-toggle-installment-btn').click();
+    await expect(page.getByTestId('edit-installment-chip-2')).toBeVisible();
+
+    // Seleciona 2 parcelas
+    await page.getByTestId('edit-installment-chip-2').click();
+    await expect(page.getByTestId('edit-installment-preview-box')).toBeVisible();
+
+    // Salva a alteração
+    await page.getByText('Salvar Alterações').first().click();
+
+    // Deve agora exibir a badge de parcela 1/2 no mês atual
+    await expect(page.getByText(/1\/2/).first()).toBeVisible();
+
+    // Navega para o próximo mês e verifica a parcela 2/2
+    await page.getByTestId('next-month-btn').click();
+    await expect(page.getByText(/2\/2/).first()).toBeVisible();
+  });
 });
