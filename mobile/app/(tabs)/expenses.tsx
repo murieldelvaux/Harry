@@ -247,8 +247,16 @@ export default function ExpensesScreen() {
   // Open Edit
   const handleOpenEdit = (item: ExpenseDto) => {
     setEditingExpense(item);
-    setDescription(item.description);
-    setAmount(maskCurrency(item.amount));
+    const cleanDesc = item.description.replace(/\s*\(\d+\/\d+\)$/, '').trim();
+    setDescription(cleanDesc);
+
+    const isInst = !!(item.totalInstallments && item.totalInstallments > 1);
+    setIsInstallment(isInst);
+    setTotalInstallments(item.totalInstallments || 2);
+
+    const fullAmount = isInst ? Number(item.amount) * (item.totalInstallments || 1) : Number(item.amount);
+    setAmount(maskCurrency(fullAmount));
+
     setTransactionType(item.type || TransactionType.EXPENSE);
     setCategory(item.category);
     setScope(item.scope);
@@ -318,6 +326,9 @@ export default function ExpensesScreen() {
           scope,
           paidByUserId: scope === RecordScope.SHARED ? (paidByUserId || editingExpense.userId) : editingExpense.userId,
           ...(isoDate && { date: isoDate }),
+          totalInstallments: (transactionType === TransactionType.EXPENSE && isInstallment && totalInstallments > 1)
+            ? totalInstallments
+            : (editingExpense.totalInstallments ? 1 : undefined),
         },
       });
       setEditModalVisible(false);
@@ -2327,6 +2338,172 @@ export default function ExpensesScreen() {
                 onChange={setCustomDate}
                 outputFormat="BR"
               />
+
+              {/* COMPRA PARCELADA */}
+              {transactionType === TransactionType.EXPENSE && (
+                <View
+                  style={{
+                    marginVertical: 12,
+                    padding: 14,
+                    borderRadius: 14,
+                    borderWidth: 1,
+                    borderColor: isInstallment ? theme.primary : theme.border,
+                    backgroundColor: isInstallment
+                      ? (isDark ? 'rgba(59, 130, 246, 0.12)' : '#EFF6FF')
+                      : theme.surfaceSubtle,
+                  }}
+                >
+                  <TouchableOpacity
+                    testID="edit-toggle-installment-btn"
+                    activeOpacity={0.8}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                    onPress={() => setIsInstallment(!isInstallment)}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, marginRight: 8 }}>
+                      <Text style={{ fontSize: 20 }}>💳</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: theme.textPrimary }}>
+                          Compra Parcelada?
+                        </Text>
+                        <Text style={{ fontSize: 12, color: theme.textSecondary }}>
+                          Lança e projeta nos meses seguintes
+                        </Text>
+                      </View>
+                    </View>
+                    <View
+                      style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: 12,
+                        borderWidth: 2,
+                        borderColor: isInstallment ? theme.primary : theme.textMuted,
+                        backgroundColor: isInstallment ? theme.primary : 'transparent',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {isInstallment && <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '900' }}>✓</Text>}
+                    </View>
+                  </TouchableOpacity>
+
+                  {isInstallment && (
+                    <View style={{ marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : '#DBEAFE' }}>
+                      <Text style={[styles.fieldLabel, { color: theme.textSecondary, marginBottom: 8 }]}>
+                        Número de Parcelas
+                      </Text>
+
+                      {/* Quick chips: 2x, 3x, 4x, 5x, 6x, 10x, 12x */}
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                        {[2, 3, 4, 5, 6, 10, 12].map((num) => {
+                          const isSel = totalInstallments === num;
+                          return (
+                            <TouchableOpacity
+                              key={num}
+                              testID={`edit-installment-chip-${num}`}
+                              style={{
+                                paddingHorizontal: 12,
+                                paddingVertical: 6,
+                                borderRadius: 8,
+                                borderWidth: 1,
+                                borderColor: isSel ? theme.primary : theme.border,
+                                backgroundColor: isSel ? theme.primary : theme.inputBg,
+                              }}
+                              onPress={() => setTotalInstallments(num)}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: '700',
+                                  color: isSel ? '#FFF' : theme.textPrimary,
+                                }}
+                              >
+                                {num}x
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+
+                      {/* Stepper for custom installments: [-] [ N ] [+] */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                        <TouchableOpacity
+                          testID="edit-installment-decrement"
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 18,
+                            backgroundColor: theme.inputBg,
+                            borderWidth: 1,
+                            borderColor: theme.border,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                          onPress={() => setTotalInstallments(Math.max(2, totalInstallments - 1))}
+                        >
+                          <Text style={{ fontSize: 18, fontWeight: '700', color: theme.textPrimary }}>-</Text>
+                        </TouchableOpacity>
+
+                        <Text testID="edit-installment-count-label" style={{ fontSize: 16, fontWeight: '800', color: theme.textPrimary, minWidth: 50, textAlign: 'center' }}>
+                          {totalInstallments}x
+                        </Text>
+
+                        <TouchableOpacity
+                          testID="edit-installment-increment"
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 18,
+                            backgroundColor: theme.inputBg,
+                            borderWidth: 1,
+                            borderColor: theme.border,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                          onPress={() => setTotalInstallments(Math.min(72, totalInstallments + 1))}
+                        >
+                          <Text style={{ fontSize: 18, fontWeight: '700', color: theme.textPrimary }}>+</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Simulation info */}
+                      {(() => {
+                        const numVal = unmaskCurrency(amount);
+                        const parcelVal = !isNaN(numVal) && numVal > 0 ? (numVal / totalInstallments) : 0;
+                        const startDate = customDate ? (parseDateInput(customDate) ? new Date(parseDateInput(customDate)!) : new Date()) : new Date();
+                        const endDate = new Date(startDate);
+                        endDate.setMonth(endDate.getMonth() + (totalInstallments - 1));
+                        const startMonthName = MONTH_NAMES[startDate.getMonth()];
+                        const endMonthName = MONTH_NAMES[endDate.getMonth()];
+                        const startYear = startDate.getFullYear();
+                        const endYear = endDate.getFullYear();
+
+                        return (
+                          <View
+                            testID="edit-installment-preview-box"
+                            style={{
+                              padding: 10,
+                              borderRadius: 10,
+                              backgroundColor: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.7)',
+                              borderWidth: 1,
+                              borderColor: isDark ? 'rgba(255,255,255,0.05)' : '#E2E8F0',
+                            }}
+                          >
+                            <Text style={{ fontSize: 12.5, fontWeight: '700', color: theme.textPrimary }}>
+                              📊 {totalInstallments} parcelas de {formatCurrency(parcelVal)}
+                            </Text>
+                            <Text style={{ fontSize: 11.5, color: theme.textSecondary, marginTop: 2 }}>
+                              🗓️ Cobranças de {startMonthName}/{startYear} até {endMonthName}/{endYear}
+                            </Text>
+                            <Text style={{ fontSize: 11, color: theme.textMuted, marginTop: 4 }}>
+                              ✨ Cada parcela entrará no extrato e fechamento do seu respectivo mês.
+                            </Text>
+                          </View>
+                        );
+                      })()}
+                    </View>
+                  )}
+                </View>
+              )}
 
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
                 Escopo {transactionType === TransactionType.INCOME ? 'do Ganho' : 'do Gasto'}

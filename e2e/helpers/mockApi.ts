@@ -469,6 +469,79 @@ export async function setupMockApi(page: Page, options: SetupMockApiOptions = {}
       return route.fulfill({ status: 201, json: newExpense });
     }
 
+    if (pathname.match(/^\/expenses\/[a-zA-Z0-9_-]+$/) && method === 'PATCH') {
+      const id = pathname.split('/').pop();
+      const body = route.request().postDataJSON();
+      const existing = expenses.find((e) => e.id === id);
+
+      if (!existing) {
+        return route.fulfill({ status: 404, json: { message: 'Expense not found' } });
+      }
+
+      if (body.totalInstallments && body.totalInstallments > 1) {
+        const N = body.totalInstallments;
+        const totalAmount = body.amount !== undefined ? Number(body.amount) : Number(existing.amount);
+        const baseInstallmentAmount = Math.floor((totalAmount / N) * 100) / 100;
+        const remainder = Math.round((totalAmount - (baseInstallmentAmount * N)) * 100) / 100;
+
+        const rawDesc = body.description !== undefined ? body.description.trim() : existing.description;
+        const baseDesc = rawDesc.replace(/\s*\(\d+\/\d+\)$/, '').trim();
+        const baseDate = body.date ? new Date(body.date) : new Date(existing.date);
+
+        if (existing.installmentGroupId) {
+          expenses = expenses.filter((e) => e.installmentGroupId !== existing.installmentGroupId || e.id === id);
+        }
+
+        const installmentGroupId = existing.installmentGroupId || 'inst-grp-' + Date.now();
+        const firstInstallmentAmount = baseInstallmentAmount + remainder;
+
+        Object.assign(existing, {
+          ...body,
+          description: `${baseDesc} (1/${N})`,
+          amount: firstInstallmentAmount,
+          date: baseDate.toISOString(),
+          installmentGroupId,
+          installmentNumber: 1,
+          totalInstallments: N,
+        });
+
+        for (let i = 2; i <= N; i++) {
+          const instDate = new Date(baseDate.getTime());
+          instDate.setMonth(baseDate.getMonth() + (i - 1));
+          const item = {
+            ...existing,
+            id: `exp-inst-${Date.now()}-${i}`,
+            description: `${baseDesc} (${i}/${N})`,
+            amount: baseInstallmentAmount,
+            date: instDate.toISOString(),
+            installmentGroupId,
+            installmentNumber: i,
+            totalInstallments: N,
+          };
+          expenses.unshift(item);
+        }
+
+        return route.fulfill({ status: 200, json: existing });
+      }
+
+      if (body.totalInstallments === 1 && existing.installmentGroupId) {
+        expenses = expenses.filter((e) => e.installmentGroupId !== existing.installmentGroupId || e.id === id);
+        const rawDesc = body.description !== undefined ? body.description.trim() : existing.description;
+        const cleanDesc = rawDesc.replace(/\s*\(\d+\/\d+\)$/, '').trim();
+        Object.assign(existing, {
+          ...body,
+          description: cleanDesc,
+          installmentGroupId: null,
+          installmentNumber: null,
+          totalInstallments: null,
+        });
+        return route.fulfill({ status: 200, json: existing });
+      }
+
+      Object.assign(existing, body);
+      return route.fulfill({ status: 200, json: existing });
+    }
+
     if (pathname.match(/^\/expenses\/[a-zA-Z0-9_-]+$/) && method === 'DELETE') {
       const id = pathname.split('/').pop();
       const deleteAll = url.searchParams.get('deleteAll') === 'true';

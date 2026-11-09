@@ -926,6 +926,147 @@ export class ExpensesService {
       } else {
         householdId = null;
       }
+    } else {
+      householdId = existing.householdId;
+    }
+
+    // Se o usuário está convertendo ou alterando o parcelamento
+    if (dto.totalInstallments && dto.totalInstallments > 1) {
+      const N = dto.totalInstallments;
+      const totalAmount = dto.amount !== undefined ? Number(dto.amount) : Number(existing.amount);
+      const baseInstallmentAmount = Math.floor((totalAmount / N) * 100) / 100;
+      const remainder = Math.round((totalAmount - (baseInstallmentAmount * N)) * 100) / 100;
+
+      const rawDesc = dto.description !== undefined ? dto.description.trim() : existing.description;
+      const baseDesc = rawDesc.replace(/\s*\(\d+\/\d+\)$/, '').trim();
+      const baseDate = dto.date ? new Date(dto.date) : new Date(existing.date);
+      const effectivePaidByUserId = dto.paidByUserId !== undefined ? dto.paidByUserId : existing.paidByUserId;
+      const effectiveScope = dto.scope !== undefined ? dto.scope : existing.scope;
+      const effectiveType = dto.type !== undefined ? dto.type : existing.type;
+      const effectiveCategory = dto.category !== undefined ? dto.category : existing.category;
+
+      if (existing.installmentGroupId) {
+        await this.prisma.expense.deleteMany({
+          where: {
+            installmentGroupId: existing.installmentGroupId,
+            id: { not: existing.id },
+          },
+        });
+      }
+
+      const installmentGroupId = existing.installmentGroupId || randomUUID();
+      const firstInstallmentAmount = baseInstallmentAmount + remainder;
+
+      const updated = await this.prisma.expense.update({
+        where: { id },
+        data: {
+          description: `${baseDesc} (1/${N})`,
+          amount: firstInstallmentAmount,
+          type: (effectiveType as any) || TransactionType.EXPENSE,
+          category: (effectiveCategory as any) || ExpenseCategory.OTHER,
+          scope: (effectiveScope as any) || RecordScope.PRIVATE,
+          paidByUserId: effectivePaidByUserId,
+          householdId,
+          date: baseDate,
+          installmentGroupId,
+          installmentNumber: 1,
+          totalInstallments: N,
+        },
+        include: {
+          user: { select: { id: true, name: true } },
+          paidBy: { select: { id: true, name: true } },
+        },
+      });
+
+      for (let i = 2; i <= N; i++) {
+        const instDate = new Date(baseDate.getTime());
+        const originalDay = baseDate.getDate();
+        instDate.setMonth(baseDate.getMonth() + (i - 1));
+        if (instDate.getDate() !== originalDay) {
+          instDate.setDate(0);
+        }
+
+        const nextExp = await this.prisma.expense.create({
+          data: {
+            description: `${baseDesc} (${i}/${N})`,
+            amount: baseInstallmentAmount,
+            type: (effectiveType as any) || TransactionType.EXPENSE,
+            category: (effectiveCategory as any) || ExpenseCategory.OTHER,
+            scope: (effectiveScope as any) || RecordScope.PRIVATE,
+            date: instDate,
+            rawSource: 'manual_app',
+            userId,
+            paidByUserId: effectivePaidByUserId,
+            householdId,
+            installmentGroupId,
+            installmentNumber: i,
+            totalInstallments: N,
+          },
+          include: {
+            user: { select: { id: true, name: true } },
+            paidBy: { select: { id: true, name: true } },
+          },
+        });
+
+        this.realtimeService.emit({
+          type: 'EXPENSE_CREATED',
+          userId,
+          householdId: nextExp.householdId,
+          data: this.mapExpense(nextExp),
+        });
+      }
+
+      this.realtimeService.emit({
+        type: 'EXPENSE_UPDATED',
+        userId,
+        householdId: updated.householdId,
+        data: this.mapExpense(updated),
+      });
+
+      return this.mapExpense(updated);
+    }
+
+    // Se o usuário está desmarcando o parcelamento (dto.totalInstallments === 1)
+    if (dto.totalInstallments === 1 && existing.installmentGroupId) {
+      await this.prisma.expense.deleteMany({
+        where: {
+          installmentGroupId: existing.installmentGroupId,
+          id: { not: existing.id },
+        },
+      });
+
+      const rawDesc = dto.description !== undefined ? dto.description.trim() : existing.description;
+      const cleanDesc = rawDesc.replace(/\s*\(\d+\/\d+\)$/, '').trim();
+
+      const updated = await this.prisma.expense.update({
+        where: { id },
+        data: {
+          description: cleanDesc,
+          ...(dto.amount !== undefined && { amount: dto.amount }),
+          ...(dto.type !== undefined && { type: dto.type as any }),
+          ...(dto.category !== undefined && { category: dto.category as any }),
+          ...(dto.scope !== undefined && { scope: dto.scope as any }),
+          ...(dto.paidByUserId !== undefined && { paidByUserId: dto.paidByUserId }),
+          ...(householdId !== undefined && { householdId }),
+          ...(dto.date !== undefined && { date: new Date(dto.date) }),
+          installmentGroupId: null,
+          installmentNumber: null,
+          totalInstallments: null,
+        },
+        include: {
+          user: { select: { id: true, name: true } },
+          paidBy: { select: { id: true, name: true } },
+        },
+      });
+
+      this.realtimeService.emit({
+        type: 'EXPENSE_UPDATED',
+        userId,
+        householdId: updated.householdId,
+        data: this.mapExpense(updated),
+      });
+
+      return this.mapExpense(updated);
     }
 
     const updated = await this.prisma.expense.update({
