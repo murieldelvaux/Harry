@@ -177,11 +177,16 @@ model Expense {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 
+  installmentGroupId String?
+  installmentNumber  Int?
+  totalInstallments  Int?
+
   @@index([userId, scope])
   @@index([householdId, scope])
   @@index([paidByUserId])
   @@index([settlementId])
   @@index([date])
+  @@index([installmentGroupId])
 }
 
 model Settlement {

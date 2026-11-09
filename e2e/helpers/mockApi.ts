@@ -364,7 +364,11 @@ export async function setupMockApi(page: Page, options: SetupMockApiOptions = {}
       let filtered = [...expenses];
       const type = url.searchParams.get('type');
       const scope = url.searchParams.get('scope');
+      const month = url.searchParams.get('month');
 
+      if (month) {
+        filtered = filtered.filter((e) => !e.date || e.date.slice(0, 7) === month);
+      }
       if (type) {
         filtered = filtered.filter((e) => (e.type || 'EXPENSE') === type);
       }
@@ -421,6 +425,39 @@ export async function setupMockApi(page: Page, options: SetupMockApiOptions = {}
 
     if (pathname === '/expenses' && method === 'POST') {
       const body = route.request().postDataJSON();
+      if (body.totalInstallments && body.totalInstallments > 1) {
+        const N = body.totalInstallments;
+        const totalAmount = Number(body.amount);
+        const baseInstallmentAmount = Math.floor((totalAmount / N) * 100) / 100;
+        const remainder = Math.round((totalAmount - (baseInstallmentAmount * N)) * 100) / 100;
+        const installmentGroupId = 'inst-grp-' + Date.now();
+        const baseDate = body.date ? new Date(body.date) : new Date();
+
+        const createdList = [];
+        for (let i = 1; i <= N; i++) {
+          const instDate = new Date(baseDate.getTime());
+          instDate.setMonth(baseDate.getMonth() + (i - 1));
+          const currentAmount = i === 1 ? baseInstallmentAmount + remainder : baseInstallmentAmount;
+          const currentDesc = body.description.includes('(') ? body.description : `${body.description} (${i}/${N})`;
+
+          const item = {
+            id: `exp-inst-${Date.now()}-${i}`,
+            ...body,
+            description: currentDesc,
+            amount: currentAmount,
+            date: instDate.toISOString(),
+            userId: currentUser?.id,
+            householdId: currentUser?.householdId,
+            installmentGroupId,
+            installmentNumber: i,
+            totalInstallments: N,
+          };
+          expenses.unshift(item);
+          createdList.push(item);
+        }
+        return route.fulfill({ status: 201, json: createdList[0] });
+      }
+
       const newExpense = {
         id: 'exp-' + Date.now(),
         ...body,
@@ -434,7 +471,14 @@ export async function setupMockApi(page: Page, options: SetupMockApiOptions = {}
 
     if (pathname.match(/^\/expenses\/[a-zA-Z0-9_-]+$/) && method === 'DELETE') {
       const id = pathname.split('/').pop();
-      expenses = expenses.filter((e) => e.id !== id);
+      const deleteAll = url.searchParams.get('deleteAll') === 'true';
+      const existing = expenses.find((e) => e.id === id);
+
+      if (deleteAll && existing?.installmentGroupId) {
+        expenses = expenses.filter((e) => e.installmentGroupId !== existing.installmentGroupId);
+      } else {
+        expenses = expenses.filter((e) => e.id !== id);
+      }
       return route.fulfill({ status: 200, json: { success: true } });
     }
 
