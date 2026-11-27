@@ -19,8 +19,11 @@ export function useGoals() {
       const { data } = await apiClient.post<GoalDto>('/goals', dto);
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
+    onSuccess: async (created) => {
+      queryClient.setQueryData<GoalDto[]>(queryKeys.goals.list(), (old) =>
+        old ? [created, ...old.filter((g) => g.id !== created.id)] : [created],
+      );
+      await queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
     },
   });
 
@@ -29,8 +32,8 @@ export function useGoals() {
       const { data } = await apiClient.post<GoalDto>(`/goals/${id}/progress`, dto);
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
     },
   });
 
@@ -39,8 +42,8 @@ export function useGoals() {
       const { data } = await apiClient.patch<GoalDto>(`/goals/${id}`, dto);
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
     },
   });
 

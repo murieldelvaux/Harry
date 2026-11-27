@@ -405,7 +405,7 @@ export default function ProfileScreen() {
 
             <View style={[styles.statusBadge, { backgroundColor: theme.surfaceSubtle }]}>
               <Text style={[styles.statusBadgeText, { color: theme.textSecondary }]}>
-                {household?.name ? `🏠 Espaço: ${household.name}` : '👤 Conta Individual'}
+                {household?.name ? `🏠  Espaço: ${household.name}` : '👤  Conta Individual'}
               </Text>
             </View>
           </View>
@@ -470,13 +470,13 @@ export default function ProfileScreen() {
             {/* O que é incluso no resumo diário */}
             <View style={styles.briefingPillsRow}>
               <View style={[styles.briefingPill, { backgroundColor: isDark ? "rgba(99, 102, 241, 0.15)" : "#EEF2FF", borderColor: theme.border }]}>
-                <Text style={[styles.briefingPillText, { color: theme.primary }]}>📅 Agenda do Dia</Text>
+                <Text style={[styles.briefingPillText, { color: theme.primary }]}>📅  Agenda do Dia</Text>
               </View>
               <View style={[styles.briefingPill, { backgroundColor: isDark ? "rgba(16, 185, 129, 0.15)" : "#ECFDF5", borderColor: theme.border }]}>
-                <Text style={[styles.briefingPillText, { color: "#10B981" }]}>📌 Lembretes & Tarefas</Text>
+                <Text style={[styles.briefingPillText, { color: "#10B981" }]}>📌  Lembretes & Tarefas</Text>
               </View>
               <View style={[styles.briefingPill, { backgroundColor: isDark ? "rgba(245, 158, 11, 0.15)" : "#FEF3C7", borderColor: theme.border }]}>
-                <Text style={[styles.briefingPillText, { color: "#F59E0B" }]}>🛒 Lista de Compras</Text>
+                <Text style={[styles.briefingPillText, { color: "#F59E0B" }]}>🛒  Lista de Compras</Text>
               </View>
             </View>
 

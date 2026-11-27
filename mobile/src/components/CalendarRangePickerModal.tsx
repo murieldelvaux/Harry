@@ -508,21 +508,27 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 8,
     borderTopWidth: 1,
     paddingTop: 14,
     marginTop: 4,
   },
   clearBtn: {
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
   },
   clearBtnText: {
-    fontSize: 14,
+    fontSize: 13.5,
   },
   actionsRight: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 6,
+    flexShrink: 1,
   },
 });

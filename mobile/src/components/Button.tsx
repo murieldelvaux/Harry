@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 20,
     borderRadius: 12,
-    gap: 8,
+    gap: 10,
   },
   disabled: {
     opacity: 0.5,
@@ -118,5 +118,7 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 15,
     fontWeight: '700',
+    textAlign: 'center',
+    flexShrink: 1,
   },
 });

@@ -24,8 +24,8 @@ export function useShoppingList(scope?: RecordScope) {
 
   const createMutation = useMutation({
     mutationFn: (dto: CreateShoppingItemDto) => shoppingListService.create(dto),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.shoppingList.all });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.shoppingList.all });
     },
   });
 
@@ -65,8 +65,8 @@ export function useShoppingList(scope?: RecordScope) {
   const updateMutation = useMutation({
     mutationFn: ({ id, dto }: { id: string; dto: UpdateShoppingItemDto }) =>
       shoppingListService.update(id, dto),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.shoppingList.all });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.shoppingList.all });
     },
   });
 

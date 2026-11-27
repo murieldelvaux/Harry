@@ -242,7 +242,7 @@ export default function GoalsScreen() {
             ]}
           >
             <View style={styles.summaryHeroTop}>
-              <View>
+              <View style={{ flexShrink: 1, minWidth: 140 }}>
                 <Text style={[styles.summaryHeroLabel, { color: theme.textSecondary }]}>
                   Total Guardado
                 </Text>
@@ -313,7 +313,7 @@ export default function GoalsScreen() {
                       <Text style={[styles.goalTitle, { color: theme.textPrimary }]}>
                         {item.title}
                       </Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 4 }}>
                         <ScopeBadge scope={item.scope} />
                         {item.targetDate && (
                           <Text style={[styles.dateBadge, { color: theme.textMuted }]}>
@@ -709,11 +709,14 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     marginBottom: 20,
+    overflow: 'hidden',
   },
   summaryHeroTop: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    gap: 8,
     marginBottom: 12,
   },
   summaryHeroLabel: {
@@ -732,6 +735,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 10,
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
   },
   percentBadgeText: {
     fontSize: 11,
@@ -780,8 +785,10 @@ const styles = StyleSheet.create({
   },
   amountRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'baseline',
-    gap: 6,
+    columnGap: 6,
+    rowGap: 2,
     marginTop: 14,
     marginBottom: 8,
   },
@@ -792,6 +799,7 @@ const styles = StyleSheet.create({
   targetVal: {
     fontSize: 13,
     fontWeight: '500',
+    flexShrink: 0,
   },
   progressBarBg: {
     height: 8,

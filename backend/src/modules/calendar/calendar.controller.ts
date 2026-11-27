@@ -50,20 +50,16 @@ export class CalendarController {
     return this.calendarService.listCalendars(userId);
   }
 
-  @Get('context7-anchor')
-  async getContext7Anchor() {
-    return {
-      anchor: this.calendarService.getContext7Anchor(),
-    };
-  }
-
   @Post('watch')
   async setupWatch(
     @CurrentUser('userId') userId: string,
     @Body('callbackBaseUrl') callbackBaseUrl: string,
     @Req() req: Request,
   ) {
-    const host = callbackBaseUrl || `${req.protocol}://${req.get('host')}/api`;
+    const host =
+      callbackBaseUrl ||
+      process.env.API_PUBLIC_URL ||
+      `${req.protocol}://${req.get('host')}/api/v1`;
     return this.calendarService.setupPushNotifications(userId, host);
   }
 

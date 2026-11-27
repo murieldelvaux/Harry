@@ -21,7 +21,13 @@ export function useGoogleCalendarAuth() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const [request, response, promptAsync] = Google.useAuthRequest({
-    responseType: ResponseType.Token,
+    responseType: ResponseType.Code,
+    shouldAutoExchangeCode: false,
+    usePKCE: true,
+    extraParams: {
+      access_type: 'offline',
+      prompt: 'consent',
+    },
     webClientId: WEB_ID || 'not-configured',
     iosClientId: IOS_ID || WEB_ID || 'not-configured',
     androidClientId: ANDROID_ID || WEB_ID || 'not-configured',
@@ -39,22 +45,31 @@ export function useGoogleCalendarAuth() {
     if (!response) return;
 
     if (response.type === 'success') {
+      const code = response.params?.code;
       const accessToken =
         response.authentication?.accessToken ||
         response.params?.access_token ||
         (response as any).params?.id_token;
 
-      if (accessToken) {
+      if (code || accessToken) {
         setIsConnecting(true);
         setStatusMessage('Vinculando conta do Google...');
-        updateProfile({ googleAccessToken: accessToken })
+        const payload = code
+          ? {
+              googleAuthCode: code,
+              googleCodeVerifier: request?.codeVerifier,
+              googleRedirectUri: request?.redirectUri,
+            }
+          : { googleAccessToken: accessToken };
+
+        updateProfile(payload)
           .then(async () => {
             setStatusMessage('Sincronizando compromissos...');
             await syncGoogle();
             setStatusMessage('Google Agenda conectado e sincronizado com sucesso! ✅');
             setTimeout(() => setStatusMessage(null), 4000);
           })
-          .catch((err) => {
+          .catch(() => {
             setStatusMessage('Erro ao salvar permissão do Google.');
             setTimeout(() => setStatusMessage(null), 4000);
           })
@@ -101,7 +116,7 @@ export function useGoogleCalendarAuth() {
     isConnecting,
     statusMessage,
     setStatusMessage,
-    hasGoogleConnected: !!user?.googleAccessToken,
+    hasGoogleConnected: !!(user?.hasGoogleConnected || user?.googleAccessToken),
     ready: !!request,
   };
 }

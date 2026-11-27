@@ -53,7 +53,7 @@ if (__DEV__) {
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
-  timeout: 10000,
+  timeout: 25000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -232,9 +232,14 @@ apiClient.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
       }
       return apiClient(originalRequest);
-    } catch (refreshError) {
+    } catch (refreshError: any) {
       processQueue(refreshError, null);
-      await tokenStorage.clearToken();
+      const status = refreshError?.response?.status;
+      // Só descarta os tokens locais se o servidor rejeitar explicitamente a sessão (401/403).
+      // Em falhas transitórias de rede, timeout ou 5xx (ex.: cold start), preserva os tokens.
+      if (status === 401 || status === 403) {
+        await tokenStorage.clearToken();
+      }
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;

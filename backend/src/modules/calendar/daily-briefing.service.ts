@@ -13,7 +13,7 @@ export class DailyBriefingService implements OnModuleInit, OnModuleDestroy {
     private prisma: PrismaService,
     private whatsappService: WhatsappService,
     private notificationsService: NotificationsService,
-  ) {}
+  ) { }
 
   onModuleInit() {
     this.logger.log('Iniciando serviço de resumos diários e periódicos com controle de timezone e horário exato...');
@@ -180,18 +180,24 @@ export class DailyBriefingService implements OnModuleInit, OnModuleDestroy {
     const now = new Date();
     const { dateStr: todayStr } = this.getLocalDateParts(now, user.timezone || 'America/Sao_Paulo');
 
-    const { message, eventsCount, tasksCount, shoppingCount } = await this.buildDailyBriefing(user, todayStr);
+    const { message, templateParams, eventsCount, tasksCount, shoppingCount } = await this.buildDailyBriefing(user, todayStr);
 
     let whatsappSent = false;
     let whatsappStatus = 'Sem telefone cadastrado';
 
     if (user.phoneNumber) {
-      try {
-        await this.whatsappService.sendWhatsAppMessage(user.phoneNumber, message);
-        whatsappSent = true;
-        whatsappStatus = 'Mensagem enviada com sucesso para o WhatsApp!';
-      } catch (err: any) {
-        whatsappStatus = `Tentativa de envio ao WhatsApp falhou: ${err.message}`;
+      const sendRes = await this.whatsappService.sendDailyBriefing(
+        user.phoneNumber,
+        templateParams,
+        message,
+      );
+      whatsappSent = sendRes.delivered;
+      if (sendRes.delivered) {
+        whatsappStatus = sendRes.usedTemplate
+          ? 'Resumo enviado com sucesso via template WhatsApp!'
+          : 'Mensagem enviada com sucesso para o WhatsApp!';
+      } else {
+        whatsappStatus = `Falha no envio ao WhatsApp (${sendRes.errorCode || 'ERR'}): ${sendRes.errorMessage || 'verifique WHATSAPP_ACCESS_TOKEN e WHATSAPP_DAILY_TEMPLATE_NAME.'}`;
       }
     }
 
@@ -295,10 +301,10 @@ export class DailyBriefingService implements OnModuleInit, OnModuleDestroy {
           const time = ev.isAllDay
             ? 'Dia inteiro'
             : ev.startDate.toLocaleTimeString('pt-BR', {
-                timeZone: user.timezone || 'America/Sao_Paulo',
-                hour: '2-digit',
-                minute: '2-digit',
-              });
+              timeZone: user.timezone || 'America/Sao_Paulo',
+              hour: '2-digit',
+              minute: '2-digit',
+            });
           const loc = ev.location ? ` (${ev.location})` : '';
           const scope = ev.scope === RecordScope.SHARED ? ' 🏠' : '';
           return `• *${time}* - ${ev.title}${loc}${scope}`;
@@ -348,6 +354,12 @@ Tenha um dia muito produtivo e abençoado! ✨📱`;
 
     return {
       message,
+      templateParams: {
+        firstName,
+        eventsText: eventsBlock,
+        tasksText: tasksBlock,
+        shoppingText: shoppingBlock,
+      },
       eventsCount: events.length,
       tasksCount: tasks.length,
       shoppingCount: totalShoppingCount,
@@ -356,9 +368,18 @@ Tenha um dia muito produtivo e abençoado! ✨📱`;
 
   private async sendDailyBriefing(user: any, todayStr: string) {
     this.logger.log(`Enviando resumo matinal diário para ${user.name || user.email} (${user.phoneNumber})`);
-    const { message, eventsCount, tasksCount } = await this.buildDailyBriefing(user, todayStr);
+    const { message, templateParams, eventsCount, tasksCount } = await this.buildDailyBriefing(user, todayStr);
     if (user.phoneNumber) {
-      await this.whatsappService.sendWhatsAppMessage(user.phoneNumber, message);
+      const waResult = await this.whatsappService.sendDailyBriefing(
+        user.phoneNumber,
+        templateParams,
+        message,
+      );
+      if (!waResult.delivered) {
+        this.logger.warn(
+          `Resumo diário WhatsApp não entregue para usuário ${user.id} (${waResult.errorCode}): ${waResult.errorMessage}`,
+        );
+      }
     }
     await this.notificationsService.dispatchNotification({
       recipientId: user.id,
@@ -367,6 +388,7 @@ Tenha um dia muito produtivo e abençoado! ✨📱`;
       title: '🌅 Seu Resumo Diário está pronto',
       body: `Você tem ${eventsCount} compromisso(s) e ${tasksCount} lembrete(s) para hoje.`,
       deepLink: '/(tabs)/calendar',
+      skipWhatsapp: true,
     });
   }
 
@@ -423,10 +445,10 @@ Tenha um dia muito produtivo e abençoado! ✨📱`;
           const time = ev.isAllDay
             ? 'Dia todo'
             : ev.startDate.toLocaleTimeString('pt-BR', {
-                timeZone: user.timezone || 'America/Sao_Paulo',
-                hour: '2-digit',
-                minute: '2-digit',
-              });
+              timeZone: user.timezone || 'America/Sao_Paulo',
+              hour: '2-digit',
+              minute: '2-digit',
+            });
           return `• ${dateStr} às ${time}: *${ev.title}*`;
         })
         .join('\n');
@@ -438,10 +460,10 @@ Tenha um dia muito produtivo e abençoado! ✨📱`;
         .map((tk: any) => {
           const dateStr = tk.dueDate
             ? tk.dueDate.toLocaleDateString('pt-BR', {
-                timeZone: user.timezone || 'America/Sao_Paulo',
-                weekday: 'short',
-                day: '2-digit',
-              })
+              timeZone: user.timezone || 'America/Sao_Paulo',
+              weekday: 'short',
+              day: '2-digit',
+            })
             : '';
           return `• ${dateStr ? `[${dateStr}] ` : ''}${tk.title}`;
         })
@@ -471,6 +493,7 @@ Planeje sua rotina com tranquilidade no app Harry! 🚀`;
       title: `🗓️ Resumo ${label} Disponível`,
       body: `Confira seus ${events.length} compromisso(s) e ${tasks.length} tarefa(s) dos próximos ${horizonDays} dias.`,
       deepLink: '/(tabs)/calendar',
+      skipWhatsapp: true,
     });
   }
 }

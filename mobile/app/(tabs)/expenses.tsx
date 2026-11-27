@@ -569,7 +569,7 @@ export default function ExpensesScreen() {
                   },
                 ]}
               >
-                👤 Meu Balanço Individual
+                👤  Meu Balanço Individual
               </Text>
             </TouchableOpacity>
 
@@ -594,7 +594,7 @@ export default function ExpensesScreen() {
                   },
                 ]}
               >
-                👥 Em Conjunto (Casal)
+                👥  Em Conjunto (Casal)
               </Text>
             </TouchableOpacity>
           </View>
@@ -635,7 +635,7 @@ export default function ExpensesScreen() {
                       { color: isMyPositiveBalance ? '#10B981' : '#EF4444' },
                     ]}
                   >
-                    {isMyPositiveBalance ? '🟢 Saldo Positivo' : '🔴 Em Déficit'}
+                    {isMyPositiveBalance ? '🟢  Saldo Positivo' : '🔴  Em Déficit'}
                   </Text>
                 </View>
               </View>
@@ -746,7 +746,7 @@ export default function ExpensesScreen() {
                       { color: isJointPositiveBalance ? '#8B5CF6' : '#EF4444' },
                     ]}
                   >
-                    {isJointPositiveBalance ? '👥 Superávit Casa' : '🔴 Déficit Casa'}
+                    {isJointPositiveBalance ? '👥  Superávit Casa' : '🔴  Déficit Casa'}
                   </Text>
                 </View>
               </View>
@@ -781,15 +781,19 @@ export default function ExpensesScreen() {
               </View>
 
               {/* RATEIO DA CASA */}
-              <View style={[styles.summarySplitRow, { borderTopColor: theme.border }]}>
-                <View style={styles.summarySplitItem}>
+              <View style={[styles.summarySplitRow, { borderTopColor: theme.border, flexWrap: 'wrap', gap: 12 }]}>
+                <View style={[styles.summarySplitItem, { minWidth: 125 }]}>
                   <View style={styles.splitBadgeRow}>
                     <Text style={{ fontSize: 13 }}>🏠</Text>
                     <Text style={[styles.summarySplitLabel, { color: theme.textSecondary }]}>
                       Total da Casa
                     </Text>
                   </View>
-                  <Text style={[styles.summarySplitValue, { color: theme.primary }]}>
+                  <Text
+                    style={[styles.summarySplitValue, { color: theme.primary }]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                  >
                     {formatCurrency(summary?.totalShared || 0)}
                   </Text>
                   <Text style={[styles.summarySplitSub, { color: theme.textMuted }]}>
@@ -797,16 +801,18 @@ export default function ExpensesScreen() {
                   </Text>
                 </View>
 
-                <View style={[styles.verticalDivider, { backgroundColor: theme.border }]} />
-
-                <View style={styles.summarySplitItem}>
+                <View style={[styles.summarySplitItem, { minWidth: 125 }]}>
                   <View style={styles.splitBadgeRow}>
                     <Text style={{ fontSize: 13 }}>⚖️</Text>
                     <Text style={[styles.summarySplitLabel, { color: theme.textSecondary }]}>
                       Divisão 50/50
                     </Text>
                   </View>
-                  <Text style={[styles.summarySplitValue, { color: theme.textPrimary }]}>
+                  <Text
+                    style={[styles.summarySplitValue, { color: theme.textPrimary }]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                  >
                     {formatCurrency(summary?.userShareOfShared || 0)} cada
                   </Text>
                   <Text style={[styles.summarySplitSub, { color: theme.textMuted }]}>
@@ -815,23 +821,24 @@ export default function ExpensesScreen() {
                 </View>
 
                 {!!summary?.partnerPrivate && summary.partnerPrivate > 0 ? (
-                  <>
-                    <View style={[styles.verticalDivider, { backgroundColor: theme.border }]} />
-                    <View style={styles.summarySplitItem}>
-                      <View style={styles.splitBadgeRow}>
-                        <Text style={{ fontSize: 13 }}>👁️</Text>
-                        <Text style={[styles.summarySplitLabel, { color: theme.textSecondary }]}>
-                          Privado do Par
-                        </Text>
-                      </View>
-                      <Text style={[styles.summarySplitValue, { color: '#8B5CF6' }]}>
-                        {formatCurrency(summary.partnerPrivate)}
-                      </Text>
-                      <Text style={[styles.summarySplitSub, { color: theme.textMuted }]}>
-                        Individual dele
+                  <View style={[styles.summarySplitItem, { minWidth: 125 }]}>
+                    <View style={styles.splitBadgeRow}>
+                      <Text style={{ fontSize: 13 }}>👁️</Text>
+                      <Text style={[styles.summarySplitLabel, { color: theme.textSecondary }]}>
+                        Privado do Par
                       </Text>
                     </View>
-                  </>
+                    <Text
+                      style={[styles.summarySplitValue, { color: '#8B5CF6' }]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                    >
+                      {formatCurrency(summary.partnerPrivate)}
+                    </Text>
+                    <Text style={[styles.summarySplitSub, { color: theme.textMuted }]}>
+                      Individual dele
+                    </Text>
+                  </View>
                 ) : null}
               </View>
             </>
@@ -855,7 +862,7 @@ export default function ExpensesScreen() {
                   { color: filterMode === 'MONTH' ? '#FFFFFF' : theme.textSecondary },
                 ]}
               >
-                📅 Por Mês
+                📅  Por Mês
               </Text>
             </TouchableOpacity>
 
@@ -873,7 +880,7 @@ export default function ExpensesScreen() {
                   { color: filterMode === 'PERIOD' ? '#FFFFFF' : theme.textSecondary },
                 ]}
               >
-                📆 Período (Datas)
+                📆  Período (Datas)
               </Text>
             </TouchableOpacity>
           </View>
@@ -928,7 +935,7 @@ export default function ExpensesScreen() {
               >
                 <View style={styles.calendarTriggerLeft}>
                   <Text style={{ fontSize: 22 }}>📅</Text>
-                  <View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={[styles.calendarTriggerLabel, { color: theme.textMuted }]}>
                       Período Selecionado
                     </Text>
@@ -976,9 +983,9 @@ export default function ExpensesScreen() {
         >
           {(
             [
-              { id: 'EXTRATO', label: '📋 Extrato', testID: 'expenses-tab-extrato' },
-              { id: 'CLOSING', label: '⚖️ Fechar Contas', testID: 'expenses-tab-closing' },
-              { id: 'ANALYTICS', label: '📊 Análise', testID: 'expenses-tab-analytics' },
+              { id: 'EXTRATO', label: '📋  Extrato', testID: 'expenses-tab-extrato' },
+              { id: 'CLOSING', label: '⚖️  Fechar Contas', testID: 'expenses-tab-closing' },
+              { id: 'ANALYTICS', label: '📊  Análise', testID: 'expenses-tab-analytics' },
             ] as const
           ).map(({ id, label, testID }) => {
             const isSelected = activeTab === id;
@@ -1025,8 +1032,8 @@ export default function ExpensesScreen() {
           {(
             [
               { id: 'ALL', label: 'Todos' },
-              { id: 'EXPENSE', label: '🔴 Gastos' },
-              { id: 'INCOME', label: '🟢 Ganhos' },
+              { id: 'EXPENSE', label: '🔴  Gastos' },
+              { id: 'INCOME', label: '🟢  Ganhos' },
             ] as const
           ).map(({ id, label }) => {
             const isSelected = activeType === id;
@@ -1037,9 +1044,9 @@ export default function ExpensesScreen() {
                   styles.typeFilterBtn,
                   isSelected && {
                     backgroundColor:
-                      id === 'INCOME' ? '#059669' : id === 'EXPENSE' ? '#DC2626' : theme.surface,
+                      id === 'INCOME' ? '#059669' : id === 'EXPENSE' ? '#DC2626' : theme.primary,
                     borderColor:
-                      id === 'INCOME' ? '#059669' : id === 'EXPENSE' ? '#DC2626' : theme.border,
+                      id === 'INCOME' ? '#059669' : id === 'EXPENSE' ? '#DC2626' : theme.primary,
                     elevation: isSelected ? 2 : 0,
                   },
                 ]}
@@ -1066,10 +1073,10 @@ export default function ExpensesScreen() {
         <View style={styles.scopeChipsContainer}>
           {[
             { id: 'ALL', label: 'Todos' },
-            { id: 'SHARED', label: '🏠 Compartilhados' },
-            { id: 'PRIVATE', label: '🔒 Meus Privados' },
+            { id: 'SHARED', label: '🏠  Compartilhados' },
+            { id: 'PRIVATE', label: '🔒  Meus Privados' },
             ...(user?.householdId || (summary?.partnerPrivate && summary.partnerPrivate > 0) || rawExpenses?.some((e) => e.scope === 'PRIVATE' && !!user?.id && e.userId !== user.id)
-              ? [{ id: 'PARTNER', label: '👁️ Privados do Par' }]
+              ? [{ id: 'PARTNER', label: '👁️  Privados do Par' }]
               : []),
           ].map(({ id, label }) => {
             const isSelected = activeScope === id;
@@ -1172,7 +1179,7 @@ export default function ExpensesScreen() {
                           {isIncome ? '🟢 Ganho' : '🔴 Gasto'}
                         </Text>
                       </View>
-                      <Text style={[styles.cardDesc, { color: theme.textPrimary, flex: 1 }]} numberOfLines={1}>
+                      <Text style={[styles.cardDesc, { color: theme.textPrimary, flex: 1 }]} numberOfLines={2}>
                         {item.description}
                       </Text>
                     </View>
@@ -1316,6 +1323,7 @@ export default function ExpensesScreen() {
               <View
                 style={{
                   flexDirection: 'row',
+                  flexWrap: 'wrap',
                   gap: 10,
                   marginBottom: 14,
                 }}
@@ -1323,6 +1331,7 @@ export default function ExpensesScreen() {
                 <View
                   style={{
                     flex: 1,
+                    minWidth: 140,
                     padding: 12,
                     borderRadius: 14,
                     backgroundColor: theme.surfaceSubtle,
@@ -1344,6 +1353,7 @@ export default function ExpensesScreen() {
                 <View
                   style={{
                     flex: 1,
+                    minWidth: 140,
                     padding: 12,
                     borderRadius: 14,
                     backgroundColor: theme.surfaceSubtle,
@@ -1375,8 +1385,10 @@ export default function ExpensesScreen() {
                         testID={`member-breakdown-${mb.userId}`}
                         style={{
                           flexDirection: 'row',
+                          flexWrap: 'wrap',
                           justifyContent: 'space-between',
                           alignItems: 'center',
+                          gap: 10,
                           padding: 12,
                           borderRadius: 12,
                           backgroundColor: theme.surfaceSubtle,
@@ -1384,15 +1396,15 @@ export default function ExpensesScreen() {
                           borderColor: theme.border,
                         }}
                       >
-                        <View>
+                        <View style={{ flex: 1, minWidth: 160 }}>
                           <Text style={{ fontSize: 14, fontWeight: '700', color: theme.textPrimary }}>
-                            👤 {mb.name}
+                            👤  {mb.name}
                           </Text>
                           <Text style={{ fontSize: 11.5, color: theme.textSecondary, marginTop: 2 }}>
                             Pagou: {formatCurrency(mb.paidAmount)} • Quota: {formatCurrency(mb.quotaAmount)}
                           </Text>
                         </View>
-                        <View style={{ alignItems: 'flex-end' }}>
+                        <View style={{ alignItems: 'flex-end', flexShrink: 0 }}>
                           <Text
                             style={{
                               fontSize: 14,
@@ -1518,8 +1530,10 @@ export default function ExpensesScreen() {
                       <View
                         style={{
                           flexDirection: 'row',
+                          flexWrap: 'wrap',
                           justifyContent: 'space-between',
                           alignItems: 'center',
+                          gap: 8,
                           marginBottom: 6,
                         }}
                       >
@@ -2691,7 +2705,7 @@ const styles = StyleSheet.create({
   splitBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     marginBottom: 4,
   },
   summarySplitLabel: {
@@ -2699,7 +2713,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   summarySplitValue: {
-    fontSize: 16,
+    fontSize: 15.5,
     fontWeight: '800',
   },
   summarySplitSub: {
@@ -2772,6 +2786,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 10,
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
@@ -2780,8 +2795,9 @@ const styles = StyleSheet.create({
   calendarTriggerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     flex: 1,
+    minWidth: 0,
   },
   calendarTriggerLabel: {
     fontSize: 10,
@@ -2795,8 +2811,9 @@ const styles = StyleSheet.create({
   },
   calendarOpenBadge: {
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 8,
+    flexShrink: 0,
   },
   calendarOpenBadgeText: {
     fontSize: 11,
@@ -2809,6 +2826,7 @@ const styles = StyleSheet.create({
   },
   scopeChipsContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     marginBottom: 16,
   },
@@ -2974,11 +2992,13 @@ const styles = StyleSheet.create({
     padding: 4,
     marginBottom: 12,
     borderWidth: 1,
-    gap: 4,
+    gap: 6,
   },
   typeFilterBtn: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    minHeight: 42,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2986,7 +3006,9 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   typeFilterText: {
-    fontSize: 13,
+    fontSize: 12.5,
+    lineHeight: 16,
+    textAlign: 'center',
   },
   typeBadge: {
     paddingHorizontal: 6,
@@ -3027,21 +3049,23 @@ const styles = StyleSheet.create({
   inOutStatsRow: {
     flexDirection: 'row',
     borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: 12,
+    paddingTop: 14,
+    paddingBottom: 14,
     marginTop: 12,
     alignItems: 'center',
   },
   inOutStatItem: {
     flex: 1,
+    minWidth: 0,
   },
   inOutLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginBottom: 4,
+    gap: 8,
+    marginBottom: 5,
   },
   inOutStatLabel: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '600',
   },
   inOutStatValue: {
@@ -3054,11 +3078,13 @@ const styles = StyleSheet.create({
     padding: 4,
     marginBottom: 16,
     borderWidth: 1,
-    gap: 4,
+    gap: 6,
   },
   balanceModeBtn: {
     flex: 1,
-    paddingVertical: 9,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    minHeight: 44,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
@@ -3067,6 +3093,8 @@ const styles = StyleSheet.create({
   },
   balanceModeText: {
     fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'center',
   },
   individualNoticeBox: {
     paddingVertical: 8,

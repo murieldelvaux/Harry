@@ -1,9 +1,17 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import axios from 'axios';
 import crypto from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { RealtimeService } from '../../common/realtime/realtime.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AuthService } from '../auth/auth.service';
 import {
   CreateCalendarEventDto,
   UpdateCalendarEventDto,
@@ -12,27 +20,81 @@ import {
   NotificationType,
 } from '../../../../packages/shared/src';
 import { GoogleCalendarMcpServer } from './google-calendar-mcp.server';
-import { Context7Manager } from './context7.config';
 
 @Injectable()
-export class CalendarService {
+export class CalendarService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(CalendarService.name);
   private mcpServer: GoogleCalendarMcpServer;
   private lastAutoSyncByUser = new Map<string, number>();
+  private periodicSyncTimer: NodeJS.Timeout | null = null;
 
   constructor(
     private prisma: PrismaService,
     private realtimeService: RealtimeService,
     private notificationsService: NotificationsService,
+    private authService: AuthService,
   ) {
     this.mcpServer = new GoogleCalendarMcpServer();
   }
 
-  /**
-   * Retorna o prompt/âncora de contexto Context7 estruturado
-   */
-  getContext7Anchor(): string {
-    return Context7Manager.getSessionPrompt();
+  onModuleInit() {
+    if (process.env.NODE_ENV === 'test') return;
+    // Sincronização incremental periódica (fallback de 15 min) + renovação de canais push
+    this.periodicSyncTimer = setInterval(() => {
+      this.runPeriodicGoogleSync().catch((err) => {
+        this.logger.debug(`Periodic Google Calendar sync falhou: ${err?.message || err}`);
+      });
+    }, 15 * 60 * 1000);
+  }
+
+  onModuleDestroy() {
+    if (this.periodicSyncTimer) {
+      clearInterval(this.periodicSyncTimer);
+      this.periodicSyncTimer = null;
+    }
+  }
+
+  async runPeriodicGoogleSync() {
+    const users = await this.prisma.user.findMany({
+      where: {
+        OR: [
+          { googleAccessToken: { not: null } },
+          { googleRefreshToken: { not: null } },
+        ],
+      },
+      select: { id: true, householdId: true },
+    });
+
+    const publicUrl = process.env.API_PUBLIC_URL?.trim();
+    const renewThreshold = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    for (const u of users) {
+      try {
+        const res: any = await this.syncWithGoogle(u.id, u.householdId);
+        if (res?.success && ((res.importedFromGoogle ?? 0) > 0 || (res.exportedToGoogle ?? 0) > 0)) {
+          this.realtimeService.emit({
+            type: 'CALENDAR_UPDATED',
+            userId: u.id,
+            householdId: u.householdId,
+            data: { origin: 'google_periodic_sync', delta: res },
+          });
+        }
+
+        if (publicUrl && publicUrl.startsWith('https://')) {
+          const expiringOrMissing = await this.prisma.googleCalendarSyncState.findFirst({
+            where: {
+              userId: u.id,
+              OR: [{ channelId: null }, { expiration: null }, { expiration: { lte: renewThreshold } }],
+            },
+          });
+          if (expiringOrMissing) {
+            await this.setupPushNotifications(u.id, publicUrl);
+          }
+        }
+      } catch (err: any) {
+        this.logger.warn(`Erro no sync periódico do usuário ${u.id}: ${err?.message || err}`);
+      }
+    }
   }
 
   /**
@@ -144,13 +206,13 @@ export class CalendarService {
    * e preserva suas cores originais do Google.
    */
   async listCalendars(userId: string): Promise<GoogleCalendarItemDto[]> {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user?.googleAccessToken) {
+    const googleAccessToken = await this.authService.getValidGoogleAccessToken(userId);
+    if (!googleAccessToken) {
       return [];
     }
 
     try {
-      const calendars = await this.mcpServer.listCalendars(user.googleAccessToken);
+      const calendars = await this.mcpServer.listCalendars(googleAccessToken);
 
       // Atualiza ou salva o estado visual de cada calendário no banco local
       for (const cal of calendars) {
@@ -216,7 +278,8 @@ export class CalendarService {
     }
 
     // Se o usuário possui token do Google Calendar configurado, sincroniza com o Google Calendar via MCP
-    if (user?.googleAccessToken) {
+    const googleAccessToken = await this.authService.getValidGoogleAccessToken(userId);
+    if (googleAccessToken) {
       try {
         let attendeeList: string[] = [];
         if (dto.attendees) {
@@ -230,7 +293,7 @@ export class CalendarService {
           }
         }
 
-        const pushRes = await this.mcpServer.createEvent(user.googleAccessToken, targetCalendarId, {
+        const pushRes = await this.mcpServer.createEvent(googleAccessToken, targetCalendarId, {
           title: dto.title,
           description: dto.description,
           startDate: dto.startDate,
@@ -321,12 +384,23 @@ export class CalendarService {
     }
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const isOwner = existing.userId === userId;
+    const isHouseholdShared =
+      existing.scope === RecordScope.SHARED &&
+      !!user?.householdId &&
+      existing.householdId === user.householdId;
+
+    if (!isOwner && !isHouseholdShared) {
+      throw new NotFoundException('Evento não encontrado');
+    }
+
+    const googleAccessToken = await this.authService.getValidGoogleAccessToken(userId);
     let googleEventId = existing.googleEventId;
     let finalLocation = dto.location !== undefined ? (dto.location || null) : existing.location;
     let finalAttendees = dto.attendees !== undefined ? (dto.attendees || null) : existing.attendees;
     const targetCalendarId = dto.googleCalendarId || existing.googleCalendarId || 'primary';
 
-    if (user?.googleAccessToken) {
+    if (googleAccessToken) {
       const eventDetails = {
         title: dto.title || existing.title,
         description: dto.description !== undefined ? (dto.description || undefined) : (existing.description || undefined),
@@ -341,7 +415,7 @@ export class CalendarService {
       if (googleEventId && !googleEventId.startsWith('dev_event_') && !googleEventId.startsWith('mock_ev_')) {
         try {
           const updateRes = await this.updateGoogleCalendarEvent(
-            user.googleAccessToken,
+            googleAccessToken,
             googleEventId,
             eventDetails,
             targetCalendarId,
@@ -363,7 +437,7 @@ export class CalendarService {
         // Se ainda não tinha googleEventId no Google Agenda, cria agora
         try {
           const pushRes = await this.pushToGoogleCalendar(
-            user.googleAccessToken,
+            googleAccessToken,
             eventDetails,
             targetCalendarId,
           );
@@ -382,6 +456,18 @@ export class CalendarService {
       }
     }
 
+    let nextScope: RecordScope | undefined;
+    let nextHouseholdId: string | null | undefined;
+    if (dto.scope !== undefined) {
+      if (dto.scope === RecordScope.SHARED && user?.householdId) {
+        nextScope = RecordScope.SHARED;
+        nextHouseholdId = user.householdId;
+      } else {
+        nextScope = RecordScope.PRIVATE;
+        nextHouseholdId = null;
+      }
+    }
+
     const updated = await this.prisma.calendarEvent.update({
       where: { id },
       data: {
@@ -392,7 +478,8 @@ export class CalendarService {
         ...(dto.isAllDay !== undefined && { isAllDay: dto.isAllDay }),
         location: finalLocation,
         attendees: finalAttendees,
-        ...(dto.scope && { scope: dto.scope }),
+        ...(nextScope !== undefined && { scope: nextScope }),
+        ...(nextHouseholdId !== undefined && { householdId: nextHouseholdId }),
         ...(dto.color && { color: dto.color }),
         ...(dto.colorId !== undefined && { colorId: dto.colorId }),
         ...(dto.googleCalendarId && { googleCalendarId: dto.googleCalendarId }),
@@ -406,7 +493,7 @@ export class CalendarService {
     this.realtimeService.emit({
       type: 'CALENDAR_UPDATED',
       userId,
-      householdId: updated.householdId,
+      householdId: updated.householdId || existing.householdId,
       data: { action: 'UPDATE', eventId: updated.id },
     });
 
@@ -420,11 +507,21 @@ export class CalendarService {
     }
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const isOwner = existing.userId === userId;
+    const isHouseholdShared =
+      existing.scope === RecordScope.SHARED &&
+      !!user?.householdId &&
+      existing.householdId === user.householdId;
 
-    if (existing.googleEventId && user?.googleAccessToken) {
+    if (!isOwner && !isHouseholdShared) {
+      throw new NotFoundException('Evento não encontrado');
+    }
+
+    const googleAccessToken = await this.authService.getValidGoogleAccessToken(userId);
+    if (existing.googleEventId && googleAccessToken) {
       try {
         await this.deleteGoogleCalendarEvent(
-          user.googleAccessToken,
+          googleAccessToken,
           existing.googleEventId,
           existing.googleCalendarId || 'primary',
         );
@@ -449,8 +546,8 @@ export class CalendarService {
    * Sincronização incremental por MCP (com fallback se full sync for exigido)
    */
   async syncWithGoogle(userId: string, householdId: string | null) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !user.googleAccessToken) {
+    const googleAccessToken = await this.authService.getValidGoogleAccessToken(userId);
+    if (!googleAccessToken) {
       return {
         success: false,
         needsConnect: true,
@@ -472,7 +569,7 @@ export class CalendarService {
           });
 
           const syncRes = await this.mcpServer.syncIncremental(
-            user.googleAccessToken,
+            googleAccessToken,
             cal.id,
             syncState?.syncToken || undefined,
           );
@@ -483,7 +580,7 @@ export class CalendarService {
               where: { id: syncState!.id },
               data: { syncToken: null },
             });
-            const fullRes = await this.mcpServer.syncIncremental(user.googleAccessToken, cal.id);
+            const fullRes = await this.mcpServer.syncIncremental(googleAccessToken, cal.id);
             const imported = await this.processSyncEvents(userId, householdId, cal, fullRes.events);
             totalImported += imported;
             this.logger.log(`[Resync] Calendário '${cal.name}' (${cal.id}): ${imported} eventos importados.`);
@@ -529,7 +626,7 @@ export class CalendarService {
       for (const localEv of localEventsWithoutGoogle) {
         try {
           const pushRes = await this.mcpServer.createEvent(
-            user.googleAccessToken,
+            googleAccessToken,
             localEv.googleCalendarId || 'primary',
             {
               title: localEv.title,
@@ -555,19 +652,35 @@ export class CalendarService {
         }
       }
 
+      // 3. Garantir registro automático de push notifications quando API_PUBLIC_URL HTTPS estiver configurado
+      const publicUrl = process.env.API_PUBLIC_URL?.trim();
+      if (publicUrl && publicUrl.startsWith('https://')) {
+        const missingWatch = await this.prisma.googleCalendarSyncState.findFirst({
+          where: {
+            userId,
+            OR: [{ channelId: null }, { webhookSecret: null }, { expiration: { lte: new Date() } }],
+          },
+        });
+        if (missingWatch) {
+          this.setupPushNotifications(userId, publicUrl).catch((err) => {
+            this.logger.debug(`Auto-watch silencioso: ${err?.message || err}`);
+          });
+        }
+      }
+
       return {
         success: true,
-        message: 'Sincronização bidirecional concluída com sucesso via MCP!',
+        message: 'Sincronização bidirecional concluída com sucesso!',
         importedFromGoogle: totalImported,
         exportedToGoogle: exportedCount,
         calendarsCount: calendars.length,
       };
     } catch (err: any) {
       const errorMsg = err?.response?.data?.error?.message || err?.message || '';
-      this.logger.error(`Erro ao sincronizar via MCP: ${errorMsg}`);
+      this.logger.error(`Erro ao sincronizar via Google Calendar: ${errorMsg}`);
       return {
         success: false,
-        message: 'Falha na sincronização via Google Calendar MCP.',
+        message: 'Falha na sincronização com o Google Calendar.',
         error: errorMsg,
       };
     }
@@ -577,22 +690,25 @@ export class CalendarService {
    * Registra Webhooks Push Notifications para todos os calendários do usuário
    */
   async setupPushNotifications(userId: string, callbackBaseUrl: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user?.googleAccessToken) {
-      return { success: false, message: 'Usuário sem token Google.' };
+    const googleAccessToken = await this.authService.getValidGoogleAccessToken(userId);
+    if (!googleAccessToken) {
+      return { success: false, message: 'Usuário sem token Google válido.' };
     }
 
     const calendars = await this.listCalendars(userId);
-    const webhookUrl = `${callbackBaseUrl.replace(/\/$/, '')}/calendar/webhook`;
+    const cleanBase = callbackBaseUrl.replace(/\/+$/, '');
+    const apiBase = cleanBase.endsWith('/api/v1') ? cleanBase : `${cleanBase}/api/v1`;
+    const webhookUrl = `${apiBase}/calendar/webhook`;
     const results = [];
 
     for (const cal of calendars) {
       const channelId = crypto.randomUUID();
-      const webhookToken = `userId=${userId}&calendarId=${cal.id}&secret=${crypto.randomBytes(8).toString('hex')}`;
+      const webhookSecret = crypto.randomBytes(24).toString('hex');
+      const webhookToken = `userId=${userId}&calendarId=${encodeURIComponent(cal.id)}&secret=${webhookSecret}`;
 
       try {
         const watchRes = await this.mcpServer.watchCalendar(
-          user.googleAccessToken,
+          googleAccessToken,
           cal.id,
           webhookUrl,
           channelId,
@@ -604,6 +720,7 @@ export class CalendarService {
           update: {
             channelId: watchRes.id,
             resourceId: watchRes.resourceId,
+            webhookSecret,
             expiration: watchRes.expiration ? new Date(Number(watchRes.expiration)) : null,
           },
           create: {
@@ -614,6 +731,7 @@ export class CalendarService {
             foregroundColor: cal.colors.foreground,
             channelId: watchRes.id,
             resourceId: watchRes.resourceId,
+            webhookSecret,
             expiration: watchRes.expiration ? new Date(Number(watchRes.expiration)) : null,
           },
         });
@@ -632,6 +750,14 @@ export class CalendarService {
     };
   }
 
+  private verifyWebhookSecret(expectedSecret: string | null | undefined, providedSecret: string | null): boolean {
+    if (!expectedSecret || !providedSecret) return false;
+    const expectedBuf = Buffer.from(expectedSecret, 'utf8');
+    const providedBuf = Buffer.from(providedSecret, 'utf8');
+    if (expectedBuf.length !== providedBuf.length) return false;
+    return crypto.timingSafeEqual(expectedBuf, providedBuf);
+  }
+
   /**
    * Processador do Webhook Push Notification do Google Calendar
    */
@@ -642,73 +768,68 @@ export class CalendarService {
 
     this.logger.log(`Webhook Push recebido. State: ${resourceState}, ChannelId: ${channelId}`);
 
+    if (!channelId || !channelToken) {
+      throw new UnauthorizedException('Headers de autenticação do webhook ausentes.');
+    }
+
+    const syncState = await this.prisma.googleCalendarSyncState.findFirst({
+      where: { channelId },
+    });
+
+    if (!syncState || !syncState.webhookSecret) {
+      throw new UnauthorizedException('Canal de webhook desconhecido ou sem segredo cadastrado.');
+    }
+
+    const params = new URLSearchParams(channelToken);
+    const providedSecret = params.get('secret');
+    if (!this.verifyWebhookSecret(syncState.webhookSecret, providedSecret)) {
+      this.logger.warn(`Tentativa de webhook Google Calendar com segredo inválido para channelId=${channelId}`);
+      throw new UnauthorizedException('Assinatura de webhook Google Calendar inválida.');
+    }
+
     if (resourceState === 'sync') {
       return { handled: true, state: 'initial_sync_ping' };
     }
 
-    let userId: string | null = null;
-    let calendarId: string | null = null;
-
-    if (channelToken) {
-      const params = new URLSearchParams(channelToken);
-      userId = params.get('userId');
-      calendarId = params.get('calendarId');
-    }
-
-    if (!userId || !calendarId) {
-      const syncState = await this.prisma.googleCalendarSyncState.findFirst({
-        where: { channelId },
-      });
-      if (syncState) {
-        userId = syncState.userId;
-        calendarId = syncState.calendarId;
-      }
-    }
-
-    if (!userId || !calendarId) {
-      this.logger.warn(`Canal ou usuário não localizado para channelId: ${channelId}`);
-      return { handled: false, error: 'Channel or user not found' };
-    }
+    const userId = syncState.userId;
+    const calendarId = syncState.calendarId;
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user?.googleAccessToken) {
+    const googleAccessToken = await this.authService.getValidGoogleAccessToken(userId);
+    if (!user || !googleAccessToken) {
       return { handled: false, error: 'User token not found' };
     }
 
-    const syncState = await this.prisma.googleCalendarSyncState.findUnique({
-      where: { userId_calendarId: { userId, calendarId } },
-    });
-
     // Executa sincronização incremental imediata
     const syncRes = await this.mcpServer.syncIncremental(
-      user.googleAccessToken,
+      googleAccessToken,
       calendarId,
-      syncState?.syncToken || undefined,
+      syncState.syncToken || undefined,
     );
 
     const calMeta: GoogleCalendarItemDto = {
       id: calendarId,
-      name: syncState?.calendarName || 'Calendário Google',
+      name: syncState.calendarName || 'Calendário Google',
       isPrimary: calendarId === 'primary',
       accessRole: 'writer',
       colors: {
-        background: syncState?.backgroundColor || '#4285F4',
-        foreground: syncState?.foregroundColor || '#FFFFFF',
+        background: syncState.backgroundColor || '#4285F4',
+        foreground: syncState.foregroundColor || '#FFFFFF',
       },
     };
 
     if (syncRes.resyncRequired) {
-      const fullRes = await this.mcpServer.syncIncremental(user.googleAccessToken, calendarId);
+      const fullRes = await this.mcpServer.syncIncremental(googleAccessToken, calendarId);
       await this.processSyncEvents(userId, user.householdId, calMeta, fullRes.events);
       if (fullRes.nextSyncToken) {
         await this.prisma.googleCalendarSyncState.update({
-          where: { id: syncState!.id },
+          where: { id: syncState.id },
           data: { syncToken: fullRes.nextSyncToken, lastSyncedAt: new Date() },
         });
       }
     } else {
       await this.processSyncEvents(userId, user.householdId, calMeta, syncRes.events);
-      if (syncRes.nextSyncToken && syncState) {
+      if (syncRes.nextSyncToken) {
         await this.prisma.googleCalendarSyncState.update({
           where: { id: syncState.id },
           data: { syncToken: syncRes.nextSyncToken, lastSyncedAt: new Date() },

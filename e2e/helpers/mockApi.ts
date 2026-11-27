@@ -622,23 +622,57 @@ export async function setupMockApi(page: Page, options: SetupMockApiOptions = {}
 
     // 5. Shopping List routes
     if (pathname === '/shopping-list' && method === 'GET') {
-      return route.fulfill({ status: 200, json: shoppingItems });
+      const scopeParam = url.searchParams.get('scope');
+      const filtered = shoppingItems.filter((s) => {
+        if (scopeParam === 'SHARED') {
+          return s.scope === 'SHARED' && s.householdId === currentUser?.householdId;
+        }
+        if (scopeParam === 'PRIVATE') {
+          return s.scope === 'PRIVATE' && s.userId === currentUser?.id;
+        }
+        return (
+          (s.scope === 'PRIVATE' && s.userId === currentUser?.id) ||
+          (s.scope === 'SHARED' && s.householdId === currentUser?.householdId)
+        );
+      });
+      return route.fulfill({ status: 200, json: filtered });
     }
 
     if (pathname === '/shopping-list' && method === 'POST') {
       const body = route.request().postDataJSON();
+      const isShared = body.scope !== 'PRIVATE' && !!currentUser?.householdId;
       const newItem = {
         id: 'shop-' + Date.now(),
         ...body,
+        scope: isShared ? 'SHARED' : 'PRIVATE',
         isCompleted: false,
         userId: currentUser?.id,
-        householdId: currentUser?.householdId,
+        householdId: isShared ? currentUser?.householdId : null,
       };
       shoppingItems.unshift(newItem);
       return route.fulfill({ status: 201, json: newItem });
     }
 
-    if (pathname.match(/^\/shopping-list\/[a-zA-Z0-9_-]+\/toggle$/) && method === 'PUT') {
+    if (pathname.match(/^\/shopping-list\/[a-zA-Z0-9_-]+$/) && method === 'PUT') {
+      const id = pathname.split('/').pop();
+      const body = route.request().postDataJSON() || {};
+      shoppingItems = shoppingItems.map((s) => {
+        if (s.id !== id) return s;
+        const nextScope = body.scope || s.scope;
+        const nextHouseholdId =
+          nextScope === 'SHARED' ? currentUser?.householdId || null : null;
+        return {
+          ...s,
+          ...body,
+          scope: nextScope,
+          householdId: nextHouseholdId,
+        };
+      });
+      const updated = shoppingItems.find((s) => s.id === id);
+      return route.fulfill({ status: 200, json: updated });
+    }
+
+    if (pathname.match(/^\/shopping-list\/[a-zA-Z0-9_-]+\/toggle$/) && (method === 'PUT' || method === 'PATCH')) {
       const id = pathname.split('/')[2];
       shoppingItems = shoppingItems.map((s) => (s.id === id ? { ...s, isCompleted: !s.isCompleted } : s));
       const updated = shoppingItems.find((s) => s.id === id);

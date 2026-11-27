@@ -6,6 +6,14 @@ import { AiParserService } from '../ai-parser/ai-parser.service';
 import { RealtimeService } from '../../common/realtime/realtime.service';
 import { AIIntent, RecordScope, TransactionType, ExpenseCategory, ParsedWhatsAppResultDto } from '../../../../packages/shared/src';
 
+export interface WhatsAppSendResult {
+  delivered: boolean;
+  messageId?: string;
+  errorCode?: string | number;
+  errorMessage?: string;
+  usedTemplate?: boolean;
+}
+
 @Injectable()
 export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
@@ -713,27 +721,21 @@ export class WhatsappService {
   }
 
   private async downloadMedia(mediaId: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
-    const permanentFallbackToken =
-      'EAAW6MXrS1fwBSlZA1qI7elB35bsW5WuQmaH5qeljz5ZCNcZCQXXyEF2YqfhpMyvFwCb0o2gs4Jx7BOV3KKSUc8e1RnVzbc1n3Wc9OW6whhZAUZClKZCoVGf6m7ZBQgdZBqw8oInk4pxkdZAQ7IyWpJi5bFrwx6skx7MxqMQNQ4CALzWOu4m6ermaLqJxgJKGpYguRQjpIYGkTLkGY01Mh9dVq2vCRq8caJu1CXOjIPONq';
-    const configuredToken = this.configService.get<string>('WHATSAPP_ACCESS_TOKEN');
-    const tokensToTry = [configuredToken, permanentFallbackToken].filter(
-      (t): t is string => !!t && t !== 'your_meta_permanent_access_token_here',
-    );
-    const uniqueTokens = Array.from(new Set(tokensToTry));
+    const accessToken = this.configService.get<string>('WHATSAPP_ACCESS_TOKEN');
 
-    if (uniqueTokens.length === 0) {
+    if (!accessToken || accessToken === 'your_meta_permanent_access_token_here') {
       this.logger.error('Cannot download media: WHATSAPP_ACCESS_TOKEN not configured.');
       return null;
     }
 
-    for (const accessToken of uniqueTokens) {
-      try {
-        // 1. Obter metadados da mídia (incluindo URL de download temporária)
-        const metaRes = await axios.get(`https://graph.facebook.com/v21.0/${mediaId}`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-        const mediaUrl = metaRes.data?.url;
-        const mimeType = metaRes.data?.mime_type || 'image/jpeg';
+    try {
+      // 1. Obter metadados da mídia (incluindo URL de download temporária)
+      const metaRes = await axios.get(`https://graph.facebook.com/v21.0/${mediaId}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        timeout: 10000,
+      });
+      const mediaUrl = metaRes.data?.url;
+      const mimeType = metaRes.data?.mime_type || 'image/jpeg';
 
       if (!mediaUrl) {
         this.logger.error(`No download URL found for media ${mediaId}`);
@@ -747,6 +749,7 @@ export class WhatsappService {
           'User-Agent': 'curl/7.64.1',
         },
         responseType: 'arraybuffer',
+        timeout: 15000,
       });
 
       return {
@@ -754,10 +757,9 @@ export class WhatsappService {
         mimeType,
       };
     } catch (err: any) {
-      this.logger.warn(`Failed to download media ${mediaId} from Meta with token: ${err?.response?.data || err.message}`);
+      this.logger.warn(`Failed to download media ${mediaId} from Meta: ${err?.response?.data?.error?.message || err.message}`);
+      return null;
     }
-    }
-    return null;
   }
 
   private async findUserByPhone(rawPhone: string) {
@@ -803,43 +805,32 @@ export class WhatsappService {
     await this.sendWhatsAppMessage(toPhone, welcomeText);
   }
 
-  async sendWhatsAppMessage(toPhone: string, text: string, fallbackPhone?: string) {
-    const permanentFallbackToken =
-      'EAAW6MXrS1fwBSlZA1qI7elB35bsW5WuQmaH5qeljz5ZCNcZCQXXyEF2YqfhpMyvFwCb0o2gs4Jx7BOV3KKSUc8e1RnVzbc1n3Wc9OW6whhZAUZClKZCoVGf6m7ZBQgdZBqw8oInk4pxkdZAQ7IyWpJi5bFrwx6skx7MxqMQNQ4CALzWOu4m6ermaLqJxgJKGpYguRQjpIYGkTLkGY01Mh9dVq2vCRq8caJu1CXOjIPONq';
-    const configuredToken = this.configService.get<string>('WHATSAPP_ACCESS_TOKEN');
-    const tokensToTry = [configuredToken, permanentFallbackToken].filter(
-      (t): t is string => !!t && t !== 'your_meta_permanent_access_token_here',
-    );
-    const uniqueTokens = Array.from(new Set(tokensToTry));
-    const phoneNumberId = this.configService.get<string>('WHATSAPP_PHONE_NUMBER_ID') || '1425020360687320';
+  public sanitizeTemplateParam(value: string, maxLen = 280): string {
+    const cleaned = (value || '')
+      .replace(/\r?\n+/g, ' • ')
+      .replace(/\t+/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    if (!cleaned) return '-';
+    if (cleaned.length <= maxLen) return cleaned;
+    return `${cleaned.slice(0, maxLen - 3).trimEnd()}...`;
+  }
 
-    if (!toPhone && !fallbackPhone) return;
-
-    // Gerar conjunto ordenado de candidatos de número de telefone
+  private buildPhoneCandidates(toPhone?: string, fallbackPhone?: string): string[] {
     const candidates = new Set<string>();
-
     const addPhoneVariants = (phoneStr?: string) => {
       if (!phoneStr) return;
       const digits = phoneStr.replace(/\D/g, '');
       if (!digits) return;
-
-      // 1. Exatamente como recebido (dígitos)
       candidates.add(digits);
-
-      // 2. Com DDI 55 se ausente
       const withCountry = digits.startsWith('55') ? digits : `55${digits}`;
       candidates.add(withCountry);
-
-      // 3. Variações do nono dígito no Brasil
       if (withCountry.startsWith('55')) {
         const national = withCountry.slice(2);
         const ddd = national.slice(0, 2);
-
-        // Se tem 10 dígitos (DDD + 8 dígitos): adiciona formato com 9
         if (national.length === 10) {
           candidates.add(`55${ddd}9${national.slice(2)}`);
         }
-        // Se tem 11 dígitos e o 3º dígito é 9 (DDD + 9 + 8 dígitos): adiciona formato sem 9
         if (national.length === 11 && national[2] === '9') {
           candidates.add(`55${ddd}${national.slice(3)}`);
         }
@@ -850,43 +841,190 @@ export class WhatsappService {
     if (fallbackPhone && fallbackPhone !== toPhone) {
       addPhoneVariants(fallbackPhone);
     }
+    return Array.from(candidates);
+  }
 
-    this.logEvent('log', `Iniciando envio WhatsApp para candidatos: [${Array.from(candidates).join(', ')}]`);
+  async sendTemplateMessage(
+    toPhone: string,
+    templateName: string,
+    bodyParams: string[],
+    langCode?: string,
+    fallbackPhone?: string,
+  ): Promise<WhatsAppSendResult> {
+    const token = this.configService.get<string>('WHATSAPP_ACCESS_TOKEN');
+    const phoneNumberId = this.configService.get<string>('WHATSAPP_PHONE_NUMBER_ID');
+    const language = langCode || this.configService.get<string>('WHATSAPP_TEMPLATE_LANG') || 'pt_BR';
 
-    if (uniqueTokens.length === 0 || !phoneNumberId) {
-      this.logEvent('warn', `[MOCK WHATSAPP OUTBOUND] Para: ${Array.from(candidates).join(', ')} | Mensagem: "${text.replace(/\n/g, ' ')}"`);
-      return;
+    const candidates = this.buildPhoneCandidates(toPhone, fallbackPhone);
+    if (candidates.length === 0) {
+      return { delivered: false, errorCode: 'NO_PHONE', errorMessage: 'Telefone do destinatário não informado.' };
     }
 
-    for (const token of uniqueTokens) {
-      for (const phone of candidates) {
-        try {
-          const response = await axios.post(
-            `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
-            {
-              messaging_product: 'whatsapp',
-              to: phone,
-              type: 'text',
-              text: { body: text },
+    if (!token || token === 'your_meta_permanent_access_token_here' || !phoneNumberId) {
+      this.logEvent('warn', `[WHATSAPP TEMPLATE NOT CONFIGURED] Template "${templateName}" não enviado: WHATSAPP_ACCESS_TOKEN ou WHATSAPP_PHONE_NUMBER_ID ausente.`);
+      return {
+        delivered: false,
+        errorCode: 'MISSING_CONFIG',
+        errorMessage: 'Credenciais da Meta WhatsApp Cloud API não configuradas.',
+        usedTemplate: true,
+      };
+    }
+
+    const sanitizedParams = bodyParams.map((p) => ({
+      type: 'text',
+      text: this.sanitizeTemplateParam(p),
+    }));
+
+    let lastErrorCode: string | number | undefined;
+    let lastErrorMsg = 'Falha ao enviar template WhatsApp.';
+
+    for (const phone of candidates) {
+      try {
+        const response = await axios.post(
+          `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
+          {
+            messaging_product: 'whatsapp',
+            to: phone,
+            type: 'template',
+            template: {
+              name: templateName,
+              language: { code: language },
+              components: [
+                {
+                  type: 'body',
+                  parameters: sanitizedParams,
+                },
+              ],
             },
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
             },
-          );
-          if (response.data?.messages?.[0]?.id) {
-            this.logEvent('log', `✅ WhatsApp outbound entregue com sucesso para ${phone} (ID: ${response.data.messages[0].id})`);
-            return;
-          }
-        } catch (err: any) {
-          const errData = err?.response?.data ? JSON.stringify(err.response.data) : err.message;
-          this.logEvent('warn', `Tentativa de envio WhatsApp para ${phone} falhou: ${errData}`);
+            timeout: 12000,
+          },
+        );
+
+        const messageId = response.data?.messages?.[0]?.id;
+        if (messageId) {
+          this.logEvent('log', `✅ WhatsApp template "${templateName}" entregue para ${phone} (ID: ${messageId})`);
+          return { delivered: true, messageId, usedTemplate: true };
         }
+      } catch (err: any) {
+        const metaErr = err?.response?.data?.error;
+        lastErrorCode = metaErr?.code || err?.response?.status || 'UNKNOWN';
+        lastErrorMsg = metaErr?.message || err?.message || lastErrorMsg;
+        this.logEvent('warn', `Tentativa de envio WhatsApp template "${templateName}" para ${phone} falhou (${lastErrorCode}): ${lastErrorMsg}`);
       }
     }
 
-    this.logEvent('error', `❌ Todas as tentativas de envio WhatsApp para os candidatos [${Array.from(candidates).join(', ')}] falharam.`);
+    return {
+      delivered: false,
+      errorCode: lastErrorCode,
+      errorMessage: lastErrorMsg,
+      usedTemplate: true,
+    };
+  }
+
+  async sendDailyBriefing(
+    toPhone: string,
+    templateParams: { firstName: string; eventsText: string; tasksText: string; shoppingText: string },
+    fallbackText: string,
+  ): Promise<WhatsAppSendResult> {
+    const templateName = this.configService.get<string>('WHATSAPP_DAILY_TEMPLATE_NAME')?.trim();
+
+    if (templateName) {
+      const templateRes = await this.sendTemplateMessage(toPhone, templateName, [
+        templateParams.firstName,
+        templateParams.eventsText,
+        templateParams.tasksText,
+        templateParams.shoppingText,
+      ]);
+      if (templateRes.delivered) {
+        return templateRes;
+      }
+      this.logEvent(
+        'warn',
+        `Template "${templateName}" falhou (${templateRes.errorCode}); tentando fallback em texto livre.`,
+      );
+    }
+
+    const textRes = await this.sendWhatsAppMessage(toPhone, fallbackText);
+    if (!textRes.delivered && String(textRes.errorCode) === '131047') {
+      this.logEvent(
+        'warn',
+        'Meta bloqueou mensagem proativa fora da janela de 24h (#131047). Configure WHATSAPP_DAILY_TEMPLATE_NAME com template UTILITY aprovado.',
+      );
+    }
+    return textRes;
+  }
+
+  async sendWhatsAppMessage(
+    toPhone: string,
+    text: string,
+    fallbackPhone?: string,
+  ): Promise<WhatsAppSendResult> {
+    const token = this.configService.get<string>('WHATSAPP_ACCESS_TOKEN');
+    const phoneNumberId = this.configService.get<string>('WHATSAPP_PHONE_NUMBER_ID');
+
+    const candidates = this.buildPhoneCandidates(toPhone, fallbackPhone);
+    if (candidates.length === 0) {
+      return { delivered: false, errorCode: 'NO_PHONE', errorMessage: 'Telefone do destinatário não informado.' };
+    }
+
+    this.logEvent('log', `Iniciando envio WhatsApp para candidatos: [${candidates.join(', ')}]`);
+
+    if (!token || token === 'your_meta_permanent_access_token_here' || !phoneNumberId) {
+      this.logEvent('warn', `[WHATSAPP NOT CONFIGURED] Para: ${candidates.join(', ')} | Configure WHATSAPP_ACCESS_TOKEN e WHATSAPP_PHONE_NUMBER_ID.`);
+      return {
+        delivered: false,
+        errorCode: 'MISSING_CONFIG',
+        errorMessage: 'WHATSAPP_ACCESS_TOKEN ou WHATSAPP_PHONE_NUMBER_ID não configurado.',
+        usedTemplate: false,
+      };
+    }
+
+    let lastErrorCode: string | number | undefined;
+    let lastErrorMsg = 'Todas as tentativas de envio WhatsApp falharam.';
+
+    for (const phone of candidates) {
+      try {
+        const response = await axios.post(
+          `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
+          {
+            messaging_product: 'whatsapp',
+            to: phone,
+            type: 'text',
+            text: { body: text },
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            timeout: 12000,
+          },
+        );
+        const messageId = response.data?.messages?.[0]?.id;
+        if (messageId) {
+          this.logEvent('log', `✅ WhatsApp outbound entregue com sucesso para ${phone} (ID: ${messageId})`);
+          return { delivered: true, messageId, usedTemplate: false };
+        }
+      } catch (err: any) {
+        const metaErr = err?.response?.data?.error;
+        lastErrorCode = metaErr?.code || err?.response?.status || 'UNKNOWN';
+        lastErrorMsg = metaErr?.message || err?.message || lastErrorMsg;
+        this.logEvent('warn', `Tentativa de envio WhatsApp para ${phone} falhou (${lastErrorCode}): ${lastErrorMsg}`);
+      }
+    }
+
+    this.logEvent('error', `❌ Todas as tentativas de envio WhatsApp para os candidatos [${candidates.join(', ')}] falharam (${lastErrorCode}).`);
+    return {
+      delivered: false,
+      errorCode: lastErrorCode,
+      errorMessage: lastErrorMsg,
+      usedTemplate: false,
+    };
   }
 }
