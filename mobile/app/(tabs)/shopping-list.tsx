@@ -20,6 +20,7 @@ import { Button } from '../../src/components/Button';
 import { ScopeBadge } from '../../src/components/ScopeBadge';
 import { EmptyState } from '../../src/components/EmptyState';
 import { LoadingState } from '../../src/components/LoadingState';
+import { SkeletonBlock, SkeletonCard, SkeletonListRow } from '../../src/components/Skeleton';
 import { RecordScope, ShoppingItemDto } from '../../../packages/shared/src';
 
 const QUICK_CATEGORIES = ['Geral', 'Hortifrúti', 'Laticínios', 'Carnes', 'Padaria', 'Bebidas', 'Limpeza', 'Higiene'];
@@ -36,6 +37,7 @@ export default function ShoppingListScreen() {
     pendingItems,
     completedItems,
     topItems,
+    isLoadingTopItems,
     isLoading,
     isRefetching,
     refetch,
@@ -170,8 +172,6 @@ export default function ShoppingListScreen() {
       ]
     );
   };
-
-  if (isLoading) return <LoadingState />;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -315,7 +315,14 @@ export default function ShoppingListScreen() {
         </View>
 
         {/* TASK 10: ANÁLISE DO QUE MAIS COLOCAMOS EM LISTA DE COMPRAS */}
-        {topItems.length > 0 && (
+        {isLoadingTopItems ? (
+          <SkeletonCard testID="skeleton-shopping-top" style={{ marginBottom: 16 }}>
+            <SkeletonBlock width="62%" height={16} />
+            <SkeletonBlock width="84%" height={12} />
+            <SkeletonBlock width="100%" height={46} borderRadius={12} />
+            <SkeletonBlock width="100%" height={46} borderRadius={12} />
+          </SkeletonCard>
+        ) : topItems.length > 0 && (
           <View
             testID="shopping-top-items-section"
             style={[
@@ -427,7 +434,14 @@ export default function ShoppingListScreen() {
           </Text>
         </View>
 
-        {pendingItems.length === 0 ? (
+        {isLoading ? (
+          <View testID="skeleton-shopping-list" style={{ gap: 10, marginBottom: 16 }}>
+            <SkeletonListRow showRightValue={false} />
+            <SkeletonListRow showRightValue={false} />
+            <SkeletonListRow showRightValue={false} />
+            <SkeletonListRow showRightValue={false} />
+          </View>
+        ) : pendingItems.length === 0 ? (
           <View
             style={[
               styles.emptyCard,

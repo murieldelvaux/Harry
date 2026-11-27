@@ -6,10 +6,12 @@ import {
   Modal,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../theme/ThemeContext';
 import { useNotifications } from '../hooks/useNotifications';
+import { SkeletonListRow } from './Skeleton';
 import { NotificationDto } from '@harry/shared';
 
 interface NotificationCenterModalProps {
@@ -26,6 +28,7 @@ export function NotificationCenterModal({
   const {
     notifications,
     unreadCount,
+    isLoading,
     markAsRead,
     markAllAsRead,
     isMarkingAllRead,
@@ -101,11 +104,15 @@ export function NotificationCenterModal({
                   accessibilityLabel="Marcar todas como lidas"
                   onPress={() => markAllAsRead()}
                   disabled={isMarkingAllRead}
-                  style={[styles.readAllBtn, { backgroundColor: theme.primaryLight }]}
+                  style={[styles.readAllBtn, { backgroundColor: theme.primaryLight, opacity: isMarkingAllRead ? 0.6 : 1 }]}
                 >
-                  <Text style={[styles.readAllText, { color: theme.primary }]}>
-                    ✓ Ler todas
-                  </Text>
+                  {isMarkingAllRead ? (
+                    <ActivityIndicator size="small" color={theme.primary} />
+                  ) : (
+                    <Text style={[styles.readAllText, { color: theme.primary }]}>
+                      ✓ Ler todas
+                    </Text>
+                  )}
                 </TouchableOpacity>
               )}
               <TouchableOpacity
@@ -119,7 +126,13 @@ export function NotificationCenterModal({
           </View>
 
           <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
-            {notifications.length === 0 ? (
+            {isLoading ? (
+              <View testID="skeleton-notifications" style={{ gap: 10, paddingVertical: 8 }}>
+                <SkeletonListRow showRightValue={false} />
+                <SkeletonListRow showRightValue={false} />
+                <SkeletonListRow showRightValue={false} />
+              </View>
+            ) : notifications.length === 0 ? (
               <View style={styles.emptyBox}>
                 <Text style={styles.emptyEmoji}>✨</Text>
                 <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>

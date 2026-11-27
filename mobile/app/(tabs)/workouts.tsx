@@ -17,6 +17,7 @@ import { Button } from '../../src/components/Button';
 import { Input } from '../../src/components/Input';
 import { CalendarDatePicker } from '../../src/components/CalendarDatePicker';
 import { LoadingState } from '../../src/components/LoadingState';
+import { SkeletonBlock, SkeletonCard, SkeletonListRow } from '../../src/components/Skeleton';
 import { useTheme } from '../../src/theme/ThemeContext';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useWorkouts } from '../../src/hooks/useWorkouts';
@@ -362,8 +363,6 @@ export default function WorkoutsScreen() {
 
     return groups;
   }, [monthWeeks, filteredWorkouts, selectedWeekNumber]);
-
-  if (isLoading) return <LoadingState />;
 
   const stravaIntegration = integrations.find((i) => i.provider === FitnessProvider.STRAVA);
 
@@ -1075,6 +1074,27 @@ export default function WorkoutsScreen() {
           </View>
         </View>
 
+        {isLoading ? (
+          <View testID="skeleton-workouts" style={{ gap: 14 }}>
+            <SkeletonCard>
+              <SkeletonBlock width="58%" height={20} style={{ alignSelf: 'center' }} />
+              <SkeletonBlock width="78%" height={12} style={{ alignSelf: 'center' }} />
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <SkeletonBlock width="31%" height={42} borderRadius={12} />
+                <SkeletonBlock width="31%" height={42} borderRadius={12} />
+                <SkeletonBlock width="31%" height={42} borderRadius={12} />
+              </View>
+            </SkeletonCard>
+            <SkeletonCard>
+              <SkeletonBlock width="62%" height={16} />
+              <SkeletonBlock width="100%" height={70} borderRadius={14} />
+              <SkeletonBlock width="100%" height={70} borderRadius={14} />
+            </SkeletonCard>
+            <SkeletonListRow />
+            <SkeletonListRow />
+          </View>
+        ) : (
+        <>
         {activeBannerMsg && (
           <View
             testID="workout-toast-banner"
@@ -1890,6 +1910,8 @@ export default function WorkoutsScreen() {
               )}
             </View>
           ))
+        )}
+        </>
         )}
       </ScrollView>
 

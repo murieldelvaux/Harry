@@ -17,6 +17,7 @@ import { useHousehold } from '../../src/hooks/useHousehold';
 import { formatCurrency, formatDate, getCategoryLabel } from '../../src/utils/format';
 import { useTheme } from '../../src/theme/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import { SkeletonBlock, SkeletonCard, SkeletonListRow } from '../../src/components/Skeleton';
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -72,6 +73,21 @@ export default function DashboardScreen() {
         </View>
 
         {/* HERO CARD FINANCEIRO (BALANÇO INDIVIDUAL vs EM CONJUNTO) */}
+        {isLoading ? (
+          <SkeletonCard testID="skeleton-dashboard-hero" style={{ marginBottom: 20 }}>
+            <SkeletonBlock width="100%" height={42} borderRadius={14} />
+            <SkeletonBlock width="45%" height={12} />
+            <SkeletonBlock width="62%" height={30} borderRadius={10} />
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
+              <SkeletonBlock width="48%" height={48} borderRadius={12} />
+              <SkeletonBlock width="48%" height={48} borderRadius={12} />
+            </View>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
+              <SkeletonBlock width="48%" height={44} borderRadius={10} />
+              <SkeletonBlock width="48%" height={44} borderRadius={10} />
+            </View>
+          </SkeletonCard>
+        ) : (
         <View
           style={[
             styles.heroCard,
@@ -364,6 +380,7 @@ export default function DashboardScreen() {
             </>
           )}
         </View>
+        )}
 
         {/* ATALHOS RÁPIDOS NA ZONA DO POLEGAR */}
         <View style={styles.actionPillsSection}>
@@ -442,7 +459,13 @@ export default function DashboardScreen() {
           </View>
 
           {/* Lista de Gastos Recentes */}
-          {expenses && expenses.length > 0 ? (
+          {isLoading ? (
+            <View testID="skeleton-dashboard-list" style={{ gap: 10 }}>
+              <SkeletonListRow />
+              <SkeletonListRow />
+              <SkeletonListRow />
+            </View>
+          ) : expenses && expenses.length > 0 ? (
             expenses.slice(0, 5).map((item) => {
               const isIncome = item.type === TransactionType.INCOME;
               return (

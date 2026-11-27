@@ -17,6 +17,7 @@ import { useHousehold } from '../../src/hooks/useHousehold';
 import { showMessage } from '../../src/utils/alert';
 import { useTheme } from '../../src/theme/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import { SkeletonBlock, SkeletonListRow } from '../../src/components/Skeleton';
 import { Input } from '../../src/components/Input';
 import { Button } from '../../src/components/Button';
 import { maskPhone, maskTime } from '../../src/utils/format';
@@ -42,6 +43,7 @@ export default function ProfileScreen() {
   const { user, updateProfile, isUpdatingProfile, updatePhone, isUpdatingPhone } = useAuth();
   const {
     household,
+    isLoading: isLoadingHousehold,
     joinHousehold,
     isJoining,
     updateHousehold,
@@ -804,7 +806,13 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {household ? (
+          {isLoadingHousehold && !household ? (
+            <View testID="skeleton-settings-household" style={{ marginTop: 14, gap: 10 }}>
+              <SkeletonBlock width="55%" height={18} />
+              <SkeletonBlock width="100%" height={56} borderRadius={14} />
+              <SkeletonListRow showRightValue={false} />
+            </View>
+          ) : household ? (
             <View style={{ marginTop: 14 }}>
               <View style={styles.householdHeaderRow}>
                 <View style={{ flex: 1, paddingRight: 8 }}>

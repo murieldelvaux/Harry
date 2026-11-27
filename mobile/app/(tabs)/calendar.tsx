@@ -13,6 +13,7 @@ import {
   Linking,
 } from 'react-native';
 import { AppHeader } from '../../src/components/AppHeader';
+import { SkeletonListRow, SkeletonPill } from '../../src/components/Skeleton';
 import { CalendarDatePicker } from '../../src/components/CalendarDatePicker';
 import { useTheme } from '../../src/theme/ThemeContext';
 import { useCalendar } from '../../src/hooks/useCalendar';
@@ -621,7 +622,15 @@ export default function CalendarScreen() {
         </View>
 
         {/* CARROSSEL DE CALENDÁRIOS GOOGLE (INCLUSIVE COMPARTILHADOS) COM CORES ORIGINAIS */}
-        {hasGoogleConnected && sharedCalendars && sharedCalendars.length > 0 && (
+        {hasGoogleConnected && isLoadingSharedCalendars ? (
+          <View testID="skeleton-calendar-shared" style={{ marginBottom: 14, gap: 8 }}>
+            <SkeletonPill width={210} height={12} />
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <SkeletonPill width={135} height={30} />
+              <SkeletonPill width={150} height={30} />
+            </View>
+          </View>
+        ) : hasGoogleConnected && sharedCalendars && sharedCalendars.length > 0 && (
           <View style={{ marginBottom: 14 }}>
             <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textSecondary, marginBottom: 8, paddingHorizontal: 4 }}>
               SUAS AGENDAS SINCRONIZADAS EM TEMPO REAL:
@@ -795,7 +804,11 @@ export default function CalendarScreen() {
           </View>
 
           {isLoading ? (
-            <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 24 }} />
+            <View testID="skeleton-calendar-events" style={{ gap: 10, marginTop: 12 }}>
+              <SkeletonListRow showRightValue={false} />
+              <SkeletonListRow showRightValue={false} />
+              <SkeletonListRow showRightValue={false} />
+            </View>
           ) : selectedDayEvents.length === 0 ? (
             <View
               style={[

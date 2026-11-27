@@ -14,6 +14,7 @@ import { Button } from '../../src/components/Button';
 import { Input } from '../../src/components/Input';
 import { ScopeBadge } from '../../src/components/ScopeBadge';
 import { LoadingState } from '../../src/components/LoadingState';
+import { SkeletonBlock, SkeletonCard, SkeletonListRow } from '../../src/components/Skeleton';
 import { EmptyState } from '../../src/components/EmptyState';
 import { CalendarRangePickerModal } from '../../src/components/CalendarRangePickerModal';
 import { CalendarDatePicker } from '../../src/components/CalendarDatePicker';
@@ -491,8 +492,6 @@ export default function ExpensesScreen() {
     ]);
   };
 
-  if (isLoading) return <LoadingState />;
-
   const isCurrentMonthActive =
     selectedYear === today.getFullYear() && selectedMonth === today.getMonth() + 1;
 
@@ -531,6 +530,25 @@ export default function ExpensesScreen() {
         </View>
 
         {/* HERO SUMMARY CARD COM SELETOR INDIVIDUAL VS CONJUNTO */}
+        {isLoading ? (
+          <View testID="skeleton-expenses" style={{ gap: 14 }}>
+            <SkeletonCard>
+              <SkeletonBlock width="100%" height={42} borderRadius={14} />
+              <SkeletonBlock width="45%" height={12} />
+              <SkeletonBlock width="58%" height={30} borderRadius={8} />
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <SkeletonBlock width="48%" height={46} borderRadius={12} />
+                <SkeletonBlock width="48%" height={46} borderRadius={12} />
+              </View>
+            </SkeletonCard>
+            <SkeletonBlock width="100%" height={44} borderRadius={14} />
+            <SkeletonListRow />
+            <SkeletonListRow />
+            <SkeletonListRow />
+            <SkeletonListRow />
+          </View>
+        ) : (
+        <>
         <View
           style={[
             styles.summaryCard,
@@ -1304,6 +1322,21 @@ export default function ExpensesScreen() {
         {/* VISÃO DE FECHAMENTO DE CONTAS (TASKS 4 & 5) */}
         {activeTab === 'CLOSING' && (
           <View style={{ gap: 16 }} testID="expenses-closing-view">
+            {isLoadingPreview ? (
+              <View testID="skeleton-expenses-closing" style={{ gap: 12 }}>
+                <SkeletonCard>
+                  <SkeletonBlock width="65%" height={18} />
+                  <SkeletonBlock width="90%" height={12} />
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <SkeletonBlock width="48%" height={64} borderRadius={14} />
+                    <SkeletonBlock width="48%" height={64} borderRadius={14} />
+                  </View>
+                  <SkeletonBlock width="100%" height={46} borderRadius={12} />
+                </SkeletonCard>
+                <SkeletonListRow />
+              </View>
+            ) : (
+            <>
             {/* CARD DE PRÉVIA & ENCONTRO DE CONTAS */}
             <View
               style={[
@@ -1618,12 +1651,31 @@ export default function ExpensesScreen() {
                 })
               )}
             </View>
+            </>
+            )}
           </View>
         )}
 
         {/* VISÃO DE ANÁLISE DOS PRINCIPAIS GASTOS (TASK 6) */}
         {activeTab === 'ANALYTICS' && (
           <View style={{ gap: 16 }} testID="expenses-analytics-view">
+            {isLoadingAnalytics ? (
+              <View testID="skeleton-expenses-analytics" style={{ gap: 12 }}>
+                <SkeletonCard>
+                  <SkeletonBlock width="60%" height={18} />
+                  <SkeletonBlock width="52%" height={28} borderRadius={8} />
+                  <SkeletonBlock width="100%" height={12} />
+                  <SkeletonBlock width="80%" height={12} />
+                </SkeletonCard>
+                <SkeletonCard>
+                  <SkeletonBlock width="55%" height={16} />
+                  <SkeletonBlock width="100%" height={14} />
+                  <SkeletonBlock width="92%" height={14} />
+                  <SkeletonBlock width="76%" height={14} />
+                </SkeletonCard>
+              </View>
+            ) : (
+            <>
             {/* COMPARATIVO ENTRE PERÍODOS */}
             <View
               style={[
@@ -1816,7 +1868,11 @@ export default function ExpensesScreen() {
                 ))
               )}
             </View>
+            </>
+            )}
           </View>
+        )}
+        </>
         )}
       </ScrollView>
 

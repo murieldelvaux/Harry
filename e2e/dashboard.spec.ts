@@ -65,4 +65,24 @@ test.describe('Dashboard & Visão Geral do Lar', () => {
     await expect(page).toHaveURL(/\/expenses/);
     await expect(page.getByText(/Financeiro & Extrato/i).first()).toBeVisible();
   });
+
+  test('deve exibir skeletons durante o carregamento inicial e substituir pelos dados reais', async ({ page }) => {
+    let releaseExpenses!: () => void;
+    const holdExpenses = new Promise<void>((resolve) => {
+      releaseExpenses = resolve;
+    });
+
+    await page.route('**/api/v1/expenses**', async (route) => {
+      await holdExpenses;
+      await route.fallback();
+    });
+
+    await page.goto('/');
+    await expect(page.getByTestId('skeleton-dashboard-hero').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('skeleton-dashboard-list').first()).toBeVisible({ timeout: 5000 });
+
+    releaseExpenses();
+    await expect(page.getByText('Supermercado Mensal').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('skeleton-dashboard-hero')).toHaveCount(0);
+  });
 });
