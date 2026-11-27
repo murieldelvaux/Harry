@@ -14,6 +14,7 @@ import { Button } from '../../src/components/Button';
 import { Input } from '../../src/components/Input';
 import { ScopeBadge } from '../../src/components/ScopeBadge';
 import { LoadingState } from '../../src/components/LoadingState';
+import { SkeletonBlock, SkeletonCard } from '../../src/components/Skeleton';
 import { EmptyState } from '../../src/components/EmptyState';
 import { CalendarDatePicker } from '../../src/components/CalendarDatePicker';
 import { useGoals } from '../../src/hooks/useGoals';
@@ -208,8 +209,6 @@ export default function GoalsScreen() {
     ]);
   };
 
-  if (isLoading) return <LoadingState />;
-
   const totalSaved = goals.reduce((acc, g) => acc + Number(g.currentAmount || 0), 0);
   const totalTarget = goals.reduce((acc, g) => acc + Number(g.targetAmount || 0), 0);
   const overallPercent = totalTarget > 0 ? Math.min(100, Math.round((totalSaved / totalTarget) * 100)) : 0;
@@ -228,6 +227,32 @@ export default function GoalsScreen() {
             </Text>
           </View>
         </View>
+
+        {isLoading ? (
+          <View testID="skeleton-goals" style={{ gap: 16 }}>
+            <SkeletonCard>
+              <SkeletonBlock width="40%" height={12} />
+              <SkeletonBlock width="58%" height={28} borderRadius={8} />
+              <SkeletonBlock width="100%" height={8} borderRadius={4} />
+              <SkeletonBlock width="45%" height={11} style={{ alignSelf: 'flex-end' }} />
+            </SkeletonCard>
+            <SkeletonCard>
+              <SkeletonBlock width="60%" height={18} />
+              <SkeletonBlock width="35%" height={22} borderRadius={10} />
+              <SkeletonBlock width="52%" height={24} />
+              <SkeletonBlock width="100%" height={8} borderRadius={4} />
+              <SkeletonBlock width="100%" height={44} borderRadius={12} />
+            </SkeletonCard>
+            <SkeletonCard>
+              <SkeletonBlock width="54%" height={18} />
+              <SkeletonBlock width="30%" height={22} borderRadius={10} />
+              <SkeletonBlock width="48%" height={24} />
+              <SkeletonBlock width="100%" height={8} borderRadius={4} />
+              <SkeletonBlock width="100%" height={44} borderRadius={12} />
+            </SkeletonCard>
+          </View>
+        ) : (
+        <>
 
         {/* HERO CARD DE METAS ACUMULADAS */}
         {goals.length > 0 && (
@@ -399,6 +424,8 @@ export default function GoalsScreen() {
             })
           )}
         </View>
+        </>
+        )}
       </ScrollView>
 
       {/* FAB FLUTUANTE NA ZONA DO POLEGAR */}
@@ -665,7 +692,7 @@ export default function GoalsScreen() {
                 onPress={() => setProgressModalVisible(false)}
                 style={{ flex: 1 }}
               />
-              <Button title="Confirmar" onPress={handleAddProgress} style={{ flex: 1 }} />
+              <Button title="Confirmar" onPress={handleAddProgress} isLoading={isUpdating} style={{ flex: 1 }} />
             </View>
           </View>
         </View>

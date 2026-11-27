@@ -20,6 +20,7 @@ import { RecordScope, TaskDto } from '../../../packages/shared/src';
 import { useTasks } from '../../src/hooks/useTasks';
 import { useTheme } from '../../src/theme/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import { SkeletonBlock, SkeletonListRow } from '../../src/components/Skeleton';
 import { CalendarDatePicker } from '../../src/components/CalendarDatePicker';
 import { maskDateTime } from '../../src/utils/format';
 
@@ -448,15 +449,27 @@ export default function TasksScreen() {
         {/* Resumo em Glances (Métricas rápidas) */}
         <View style={styles.glanceRow}>
           <View style={[styles.glanceCard, { backgroundColor: theme.surface, borderColor: theme.border }, theme.cardShadow]}>
-            <Text style={[styles.glanceNumber, { color: theme.primary }]}>{stats.pending}</Text>
+            {isLoading ? (
+              <SkeletonBlock width={32} height={24} borderRadius={6} style={{ marginBottom: 4 }} />
+            ) : (
+              <Text style={[styles.glanceNumber, { color: theme.primary }]}>{stats.pending}</Text>
+            )}
             <Text style={[styles.glanceLabel, { color: theme.textSecondary }]}>Pendentes</Text>
           </View>
           <View style={[styles.glanceCard, { backgroundColor: theme.surface, borderColor: theme.border }, theme.cardShadow]}>
-            <Text style={[styles.glanceNumber, { color: theme.warning }]}>{stats.todayTasks}</Text>
+            {isLoading ? (
+              <SkeletonBlock width={32} height={24} borderRadius={6} style={{ marginBottom: 4 }} />
+            ) : (
+              <Text style={[styles.glanceNumber, { color: theme.warning }]}>{stats.todayTasks}</Text>
+            )}
             <Text style={[styles.glanceLabel, { color: theme.textSecondary }]}>Para Hoje</Text>
           </View>
           <View style={[styles.glanceCard, { backgroundColor: theme.surface, borderColor: theme.border }, theme.cardShadow]}>
-            <Text style={[styles.glanceNumber, { color: theme.success }]}>{stats.completed}</Text>
+            {isLoading ? (
+              <SkeletonBlock width={32} height={24} borderRadius={6} style={{ marginBottom: 4 }} />
+            ) : (
+              <Text style={[styles.glanceNumber, { color: theme.success }]}>{stats.completed}</Text>
+            )}
             <Text style={[styles.glanceLabel, { color: theme.textSecondary }]}>Concluídas</Text>
           </View>
         </View>
@@ -544,6 +557,14 @@ export default function TasksScreen() {
       </View>
 
       {/* LISTA DE TAREFAS */}
+      {isLoading ? (
+        <View testID="skeleton-tasks-list" style={[styles.listContent, { gap: 10 }]}>
+          <SkeletonListRow showRightValue={false} />
+          <SkeletonListRow showRightValue={false} />
+          <SkeletonListRow showRightValue={false} />
+          <SkeletonListRow showRightValue={false} />
+        </View>
+      ) : (
       <FlatList
         data={filteredTasks}
         keyExtractor={(item) => item.id}
@@ -673,6 +694,7 @@ export default function TasksScreen() {
           );
         }}
       />
+      )}
 
       {/* FAB FLUTUANTE NA ZONA NATURAL DO POLEGAR (THUMB-ZONE ERGONOMICS) */}
       <TouchableOpacity
