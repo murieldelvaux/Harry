@@ -1,0 +1,43 @@
+name: OpenSpec Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+      - master
+      - develop
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  openspec-validate:
+    name: Validate OpenSpec Config & Specs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    env:
+      CI: true
+      OPENSPEC_TELEMETRY: '0'
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci --include=dev
+
+      - name: Validate OpenSpec Artifacts
+        run: npm run openspec:validate
