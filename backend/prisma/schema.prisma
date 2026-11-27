@@ -110,6 +110,7 @@ model User {
   expoPushToken           String?
   googleAccessToken       String?
   googleRefreshToken      String?
+  googleTokenExpiresAt    DateTime?
   calendarEvents          CalendarEvent[]
   sharePrivateExpenses    Boolean                  @default(false)
 
@@ -375,6 +376,7 @@ model GoogleCalendarSyncState {
   foregroundColor String?
   channelId       String?   @unique
   resourceId      String?
+  webhookSecret   String?
   expiration      DateTime?
   syncToken       String?
   lastSyncedAt    DateTime?
@@ -384,6 +386,7 @@ model GoogleCalendarSyncState {
   @@unique([userId, calendarId])
   @@index([userId])
   @@index([channelId])
+  @@index([expiration])
 }
 
 model WorkoutActivity {

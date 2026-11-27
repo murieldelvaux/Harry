@@ -6,7 +6,6 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { Logger } from '@nestjs/common';
 import axios from 'axios';
-import { Context7Manager } from './context7.config';
 
 export interface CalendarListMetadata {
   id: string;
@@ -68,14 +67,6 @@ export class GoogleCalendarMcpServer {
     // 1. Lista de ferramentas disponíveis
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       const tools: Tool[] = [
-        {
-          name: 'get_context7_anchor',
-          description: 'Obtém o anchor de contexto estruturado context7 com schemas e invariantes de sincronização do Google Calendar.',
-          inputSchema: {
-            type: 'object',
-            properties: {},
-          },
-        },
         {
           name: 'list_shared_calendars',
           description: 'Lista todos os calendários do usuário (inclusive compartilhados) preservando cores originais (backgroundColor, foregroundColor).',
@@ -166,16 +157,6 @@ export class GoogleCalendarMcpServer {
 
       try {
         switch (name) {
-          case 'get_context7_anchor':
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: Context7Manager.getSessionPrompt(),
-                },
-              ],
-            };
-
           case 'list_shared_calendars': {
             const list = await this.listCalendars(args?.accessToken as string);
             return {

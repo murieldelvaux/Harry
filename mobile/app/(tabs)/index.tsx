@@ -53,7 +53,7 @@ export default function DashboardScreen() {
       {/* HEADER PRINCIPAL COM MENU LATERAL HAMBÚRGUER & LOGO */}
       <AppHeader
         title="Harry"
-        subtitle={household?.name ? `🏠 ${household.name}` : 'Visão Geral do Lar'}
+        subtitle={household?.name ? `🏠  ${household.name}` : 'Visão Geral do Lar'}
       />
 
       <ScrollView
@@ -110,7 +110,7 @@ export default function DashboardScreen() {
                   },
                 ]}
               >
-                👤 Meu Balanço (Individual)
+                👤  Meu Balanço (Individual)
               </Text>
             </TouchableOpacity>
 
@@ -135,7 +135,7 @@ export default function DashboardScreen() {
                   },
                 ]}
               >
-                👥 Em Conjunto (Casal)
+                👥  Em Conjunto (Casal)
               </Text>
             </TouchableOpacity>
           </View>
@@ -144,7 +144,7 @@ export default function DashboardScreen() {
             <>
               {/* TOPO: MEU SALDO INDIVIDUAL */}
               <View style={styles.heroTop}>
-                <View>
+                <View style={{ flex: 1, minWidth: 160 }}>
                   <Text style={[styles.heroLabel, { color: theme.textSecondary }]}>
                     Meu Saldo Individual
                   </Text>
@@ -168,7 +168,7 @@ export default function DashboardScreen() {
                       { color: isMyPositiveBalance ? '#059669' : '#DC2626', fontWeight: '700' },
                     ]}
                   >
-                    {isMyPositiveBalance ? '🟢 Saldo Positivo' : '🔴 Em Déficit'}
+                    {isMyPositiveBalance ? '🟢  Saldo Positivo' : '🔴  Em Déficit'}
                   </Text>
                 </View>
               </View>
@@ -191,7 +191,7 @@ export default function DashboardScreen() {
               >
                 <View style={styles.inOutHeroItem}>
                   <Text style={[styles.inOutHeroLabel, { color: theme.textSecondary }]}>
-                    ↗️ Meus Ganhos
+                    ↗️  Meus Ganhos
                   </Text>
                   <Text style={[styles.inOutHeroValue, { color: '#059669' }]}>
                     + {formatCurrency(myIncome)}
@@ -200,7 +200,7 @@ export default function DashboardScreen() {
                 <View style={[styles.inOutHeroDivider, { backgroundColor: theme.border }]} />
                 <View style={styles.inOutHeroItem}>
                   <Text style={[styles.inOutHeroLabel, { color: theme.textSecondary }]}>
-                    ↘️ Meus Gastos Reais
+                    ↘️  Meus Gastos Reais
                   </Text>
                   <Text style={[styles.inOutHeroValue, { color: '#DC2626' }]}>
                     - {formatCurrency(myTotalExpenses)}
@@ -249,7 +249,7 @@ export default function DashboardScreen() {
             <>
               {/* TOPO: BALANÇO EM CONJUNTO */}
               <View style={styles.heroTop}>
-                <View>
+                <View style={{ flex: 1, minWidth: 160 }}>
                   <Text style={[styles.heroLabel, { color: theme.textSecondary }]}>
                     Balanço em Conjunto (Casal)
                   </Text>
@@ -273,7 +273,7 @@ export default function DashboardScreen() {
                       { color: isJointPositiveBalance ? '#8B5CF6' : '#DC2626', fontWeight: '700' },
                     ]}
                   >
-                    {isJointPositiveBalance ? '👥 Superávit Casa' : '🔴 Déficit Casa'}
+                    {isJointPositiveBalance ? '👥  Superávit Casa' : '🔴  Déficit Casa'}
                   </Text>
                 </View>
               </View>
@@ -296,7 +296,7 @@ export default function DashboardScreen() {
               >
                 <View style={styles.inOutHeroItem}>
                   <Text style={[styles.inOutHeroLabel, { color: theme.textSecondary }]}>
-                    ↗️ Renda Conjunta
+                    ↗️  Renda Conjunta
                   </Text>
                   <Text style={[styles.inOutHeroValue, { color: '#059669' }]}>
                     + {formatCurrency(jointIncome)}
@@ -305,7 +305,7 @@ export default function DashboardScreen() {
                 <View style={[styles.inOutHeroDivider, { backgroundColor: theme.border }]} />
                 <View style={styles.inOutHeroItem}>
                   <Text style={[styles.inOutHeroLabel, { color: theme.textSecondary }]}>
-                    ↘️ Despesas da Casa
+                    ↘️  Despesas da Casa
                   </Text>
                   <Text style={[styles.inOutHeroValue, { color: '#DC2626' }]}>
                     - {formatCurrency(jointExpenses)}
@@ -415,7 +415,7 @@ export default function DashboardScreen() {
           <View style={styles.scopeFilterRow}>
             {(['ALL', 'SHARED', 'PRIVATE'] as const).map((s) => {
               const isActive = activeScope === s;
-              const labels = { ALL: 'Todos', SHARED: '🏠 Compartilhados', PRIVATE: '🔒 Pessoais' };
+              const labels = { ALL: 'Todos', SHARED: '🏠  Compartilhados', PRIVATE: '🔒  Pessoais' };
               return (
                 <TouchableOpacity
                   key={s}
@@ -468,7 +468,7 @@ export default function DashboardScreen() {
                   </View>
 
                   <View style={styles.expenseInfoCol}>
-                    <Text style={[styles.expenseTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                    <Text style={[styles.expenseTitle, { color: theme.textPrimary }]} numberOfLines={2}>
                       {item.description}
                     </Text>
                     <View style={styles.expenseSubRow}>
@@ -592,8 +592,10 @@ const styles = StyleSheet.create({
   },
   heroTop: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 8,
     marginBottom: 8,
   },
   heroLabel: {
@@ -662,20 +664,22 @@ const styles = StyleSheet.create({
   },
   actionPillBtn: {
     flex: 1,
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
+    paddingHorizontal: 8,
     borderRadius: 16,
     borderWidth: 1,
-    gap: 8,
+    gap: 6,
   },
   actionPillEmoji: {
-    fontSize: 18,
+    fontSize: 22,
   },
   actionPillText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '700',
+    textAlign: 'center',
   },
   activitySection: {
     gap: 12,
@@ -691,6 +695,7 @@ const styles = StyleSheet.create({
   },
   scopeFilterRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
   scopeChip: {
@@ -726,6 +731,7 @@ const styles = StyleSheet.create({
   },
   expenseSubRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     marginTop: 3,
     gap: 4,
@@ -805,11 +811,13 @@ const styles = StyleSheet.create({
     padding: 4,
     marginBottom: 16,
     borderWidth: 1,
-    gap: 4,
+    gap: 6,
   },
   balanceModeBtn: {
     flex: 1,
-    paddingVertical: 9,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    minHeight: 44,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
@@ -818,6 +826,8 @@ const styles = StyleSheet.create({
   },
   balanceModeText: {
     fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'center',
   },
   individualNoticeBox: {
     paddingVertical: 8,

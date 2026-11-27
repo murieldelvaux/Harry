@@ -20,11 +20,21 @@ export function useAuth() {
     queryFn: async () => {
       try {
         return await authService.getMe();
-      } catch {
-        return null;
+      } catch (err: any) {
+        const status = err?.response?.status;
+        if (status === 401 || status === 403) {
+          return null;
+        }
+        throw err;
       }
     },
     staleTime: 1000 * 60 * 5,
+    retry: (failureCount, err: any) => {
+      const status = err?.response?.status;
+      if (status === 401 || status === 403) return false;
+      return failureCount < 2;
+    },
+    refetchOnWindowFocus: false,
   });
 
   const loginMutation = useMutation({

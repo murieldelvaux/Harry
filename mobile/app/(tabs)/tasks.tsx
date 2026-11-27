@@ -14,6 +14,7 @@ import {
   Image,
   useColorScheme,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { RecordScope, TaskDto } from '../../../packages/shared/src';
 import { useTasks } from '../../src/hooks/useTasks';
@@ -434,7 +435,7 @@ export default function TasksScreen() {
       {/* TÍTULO PRINCIPAL (iOS HIG TYPOGRAPHY) & CARDS DE RESUMO */}
       <View style={styles.titleSection}>
         <View style={styles.titleRow}>
-          <View>
+          <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>
               Rotina & Lembretes
             </Text>
@@ -480,18 +481,14 @@ export default function TasksScreen() {
         </View>
       </View>
 
-      {/* FILTROS SEGMENTADOS ERGONÔMICOS (SCROLL HORIZONTAL TOUCH-FRIENDLY) */}
-      <View style={styles.filterSection}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterScrollContent}
-        >
+      {/* FILTROS SEGMENTADOS ERGONÔMICOS (QUEBRA RESPONSIVA SEM CORTES) */}
+      <View style={[styles.filterSection, { paddingHorizontal: 20 }]}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {[
             { id: 'ALL', label: 'Todas', badge: stats.total },
             { id: 'PENDING', label: 'Pendentes', badge: stats.pending },
             { id: 'TODAY', label: 'Hoje', badge: stats.todayTasks },
-            { id: 'SHARED', label: '🏠 Casa' },
+            { id: 'SHARED', label: '🏠  Casa' },
             { id: 'COMPLETED', label: '✓ Feitas', badge: stats.completed },
           ].map((item) => {
             const isActive = activeFilter === item.id;
@@ -543,7 +540,7 @@ export default function TasksScreen() {
               </TouchableOpacity>
             );
           })}
-        </ScrollView>
+        </View>
       </View>
 
       {/* LISTA DE TAREFAS */}
@@ -861,6 +858,7 @@ export default function TasksScreen() {
                 disabled={isCreating}
                 activeOpacity={0.85}
               >
+                {isCreating && <ActivityIndicator size="small" color="#FFFFFF" />}
                 <Text style={styles.submitButtonText}>
                   {isCreating ? 'Salvando...' : 'Salvar Lembrete'}
                 </Text>
@@ -1017,6 +1015,7 @@ export default function TasksScreen() {
                 onPress={handleUpdate}
                 disabled={isUpdating}
               >
+                {isUpdating && <ActivityIndicator size="small" color="#FFFFFF" />}
                 <Text style={styles.submitButtonText}>
                   {isUpdating ? 'Atualizando...' : 'Atualizar Lembrete'}
                 </Text>
@@ -1435,7 +1434,10 @@ const styles = StyleSheet.create({
     marginBottom: 40,
     paddingVertical: 14,
     borderRadius: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
+    gap: 10,
   },
   submitButtonText: {
     color: '#FFFFFF',

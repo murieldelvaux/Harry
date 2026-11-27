@@ -43,8 +43,8 @@ export function AppHeader({ title, subtitle, rightAction }: AppHeaderProps) {
 
         <TouchableOpacity onPress={openDrawer} style={styles.brandRow} activeOpacity={0.8}>
           <Image source={HarryLogo} style={styles.logo} resizeMode="contain" />
-          <View>
-            <Text style={[styles.brandTitle, { color: theme.textPrimary }]}>
+          <View style={styles.brandTextWrap}>
+            <Text style={[styles.brandTitle, { color: theme.textPrimary }]} numberOfLines={1}>
               {title || 'Harry'}
             </Text>
             {subtitle ? (
@@ -110,6 +110,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 10,
+    gap: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   leftGroup: {
@@ -117,6 +118,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     flex: 1,
+    minWidth: 0,
   },
   menuBtn: {
     width: 38,
@@ -133,8 +135,13 @@ const styles = StyleSheet.create({
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     flex: 1,
+    minWidth: 0,
+  },
+  brandTextWrap: {
+    flex: 1,
+    minWidth: 0,
   },
   logo: {
     width: 32,
@@ -187,11 +194,11 @@ const styles = StyleSheet.create({
   themeToggleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 11,
     paddingVertical: 6,
     borderRadius: 18,
     borderWidth: 1,
-    gap: 5,
+    gap: 7,
   },
   themeToggleIcon: {
     fontSize: 12,

@@ -25,16 +25,16 @@ export function useCalendar(start?: string, end?: string) {
 
   const createMutation = useMutation({
     mutationFn: (dto: CreateCalendarEventDto) => calendarService.create(dto),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all });
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, dto }: { id: string; dto: UpdateCalendarEventDto }) =>
       calendarService.update(id, dto),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all });
     },
   });
 

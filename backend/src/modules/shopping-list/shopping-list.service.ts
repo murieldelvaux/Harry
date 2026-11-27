@@ -296,9 +296,34 @@ export class ShoppingListService {
     });
   }
 
-  async toggleComplete(id: string): Promise<ShoppingItemDto> {
-    const item = await this.prisma.shoppingItem.findUnique({ where: { id } });
-    if (!item) throw new NotFoundException('Item da lista de compras não encontrado');
+  private async getAuthorizedItem(userId: string, id: string) {
+    const [item, user] = await Promise.all([
+      this.prisma.shoppingItem.findUnique({ where: { id } }),
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { householdId: true },
+      }),
+    ]);
+
+    if (!item) {
+      throw new NotFoundException('Item da lista de compras não encontrado');
+    }
+
+    const isOwner = item.userId === userId;
+    const isHouseholdShared =
+      item.scope === RecordScope.SHARED &&
+      !!user?.householdId &&
+      item.householdId === user.householdId;
+
+    if (!isOwner && !isHouseholdShared) {
+      throw new NotFoundException('Item da lista de compras não encontrado');
+    }
+
+    return { item, user };
+  }
+
+  async toggleComplete(userId: string, id: string): Promise<ShoppingItemDto> {
+    const { item } = await this.getAuthorizedItem(userId, id);
 
     const updated = await this.prisma.shoppingItem.update({
       where: { id },
@@ -315,9 +340,26 @@ export class ShoppingListService {
     return this.mapItem(updated);
   }
 
-  async update(id: string, dto: UpdateShoppingItemDto): Promise<ShoppingItemDto> {
-    const item = await this.prisma.shoppingItem.findUnique({ where: { id } });
-    if (!item) throw new NotFoundException('Item da lista de compras não encontrado');
+  async update(userId: string, id: string, dto: UpdateShoppingItemDto): Promise<ShoppingItemDto> {
+    const { item, user } = await this.getAuthorizedItem(userId, id);
+
+    let nextScope: RecordScope | undefined;
+    let nextHouseholdId: string | null | undefined;
+
+    if (dto.scope !== undefined) {
+      if (dto.scope === RecordScope.SHARED) {
+        if (!user?.householdId) {
+          throw new BadRequestException(
+            'Você precisa estar em um espaço compartilhado para mover itens para a lista compartilhada.',
+          );
+        }
+        nextScope = RecordScope.SHARED;
+        nextHouseholdId = user.householdId;
+      } else {
+        nextScope = RecordScope.PRIVATE;
+        nextHouseholdId = null;
+      }
+    }
 
     const updated = await this.prisma.shoppingItem.update({
       where: { id },
@@ -329,15 +371,31 @@ export class ShoppingListService {
         ...(dto.quantity !== undefined && { quantity: dto.quantity ? dto.quantity.trim() : null }),
         ...(dto.category !== undefined && { category: dto.category ? dto.category.trim() : null }),
         ...(dto.isCompleted !== undefined && { isCompleted: dto.isCompleted }),
-        ...(dto.scope !== undefined && { scope: dto.scope as any }),
+        ...(nextScope !== undefined && { scope: nextScope as any }),
+        ...(nextHouseholdId !== undefined && { householdId: nextHouseholdId }),
       },
+    });
+
+    this.realtimeService.emit({
+      type: 'SHOPPING_UPDATED',
+      userId,
+      householdId: updated.householdId || item.householdId,
+      data: updated,
     });
 
     return this.mapItem(updated);
   }
 
-  async delete(id: string): Promise<{ success: boolean }> {
+  async delete(userId: string, id: string): Promise<{ success: boolean }> {
+    const { item } = await this.getAuthorizedItem(userId, id);
     await this.prisma.shoppingItem.delete({ where: { id } });
+
+    this.realtimeService.emit({
+      type: 'SHOPPING_UPDATED',
+      userId,
+      householdId: item.householdId,
+    });
+
     return { success: true };
   }
 
@@ -403,7 +461,7 @@ export class ShoppingListService {
       itemsToCreate = parts.map((name) => ({ name, quantity: '1', category: 'Geral' }));
     }
 
-    const isShared = (dto.scope === RecordScope.SHARED || user?.householdId) && !!user?.householdId;
+    const isShared = dto.scope === RecordScope.PRIVATE ? false : !!user?.householdId;
     const itemScope = isShared ? RecordScope.SHARED : RecordScope.PRIVATE;
 
     const createdList: ShoppingItemDto[] = [];

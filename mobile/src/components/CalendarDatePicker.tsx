@@ -437,13 +437,15 @@ export function CalendarDatePicker({
                   title="Cancelar"
                   variant="ghost"
                   onPress={() => setVisible(false)}
-                  style={{ height: 40, marginRight: 8 }}
+                  style={{ paddingVertical: 9, paddingHorizontal: 12 }}
+                  textStyle={{ fontSize: 13.5 }}
                 />
                 <Button
                   testID={`${testID}-confirm`}
                   title="Confirmar Data"
                   onPress={handleConfirm}
-                  style={{ height: 40, minWidth: 130 }}
+                  style={{ paddingVertical: 9, paddingHorizontal: 14 }}
+                  textStyle={{ fontSize: 13.5 }}
                 />
               </View>
             </View>
@@ -657,15 +659,17 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 8,
     borderTopWidth: 1,
     paddingTop: 12,
     marginTop: 4,
   },
   clearBtn: {
     paddingVertical: 8,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
   },
   clearBtnText: {
     fontSize: 13,
@@ -673,7 +677,11 @@ const styles = StyleSheet.create({
   },
   actionsRight: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 6,
+    flexShrink: 1,
   },
 });
 

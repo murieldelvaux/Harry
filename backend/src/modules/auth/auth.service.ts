@@ -14,6 +14,7 @@ import axios from 'axios';
 import { MailService } from '../mail/mail.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { PrismaService } from '../../database/prisma.service';
+import { TokenCryptoService } from '../../common/crypto/token-crypto.service';
 import {
   RegisterDto,
   LoginDto,
@@ -34,7 +35,200 @@ export class AuthService {
     private configService: ConfigService,
     private mailService: MailService,
     private whatsappService: WhatsappService,
+    private tokenCrypto: TokenCryptoService,
   ) {}
+
+  private serializeAuthUser(user: any) {
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      phoneNumber: user.phoneNumber,
+      householdId: user.householdId,
+      avatarUrl: user.avatarUrl,
+      hasGoogleConnected: Boolean(user.googleAccessToken || user.googleRefreshToken),
+      sharePrivateExpenses: user.sharePrivateExpenses,
+    };
+  }
+
+  private getGoogleClientId(): string | undefined {
+    const direct =
+      this.configService.get<string>('GOOGLE_CLIENT_ID') ||
+      this.configService.get<string>('EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID');
+    if (direct && direct.trim()) return direct.trim();
+    const list = (this.configService.get<string>('GOOGLE_CLIENT_IDS') || '')
+      .split(',')
+      .map((s) => s.replace(/^["']|["']$/g, '').trim())
+      .filter(Boolean);
+    return list[0];
+  }
+
+  async exchangeGoogleAuthCode(params: {
+    code: string;
+    codeVerifier?: string;
+    redirectUri?: string;
+  }): Promise<{
+    accessToken: string;
+    refreshToken?: string;
+    expiresAt: Date;
+    idToken?: string;
+  }> {
+    const clientId = this.getGoogleClientId();
+    const clientSecret = this.configService.get<string>('GOOGLE_CLIENT_SECRET');
+
+    if (!clientId || !clientSecret) {
+      throw new BadRequestException(
+        'GOOGLE_CLIENT_ID ou GOOGLE_CLIENT_SECRET não configurados no servidor para troca de código OAuth.',
+      );
+    }
+
+    const body = new URLSearchParams({
+      code: params.code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: 'authorization_code',
+    });
+
+    if (params.codeVerifier) {
+      body.append('code_verifier', params.codeVerifier);
+    }
+    if (params.redirectUri) {
+      body.append('redirect_uri', params.redirectUri);
+    }
+
+    try {
+      const { data } = await axios.post(
+        'https://oauth2.googleapis.com/token',
+        body.toString(),
+        {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          timeout: 10000,
+        },
+      );
+
+      if (!data?.access_token) {
+        throw new UnauthorizedException('Google não retornou access_token na troca do código.');
+      }
+
+      const expiresInSec = Number(data.expires_in) || 3600;
+      return {
+        accessToken: String(data.access_token),
+        refreshToken: data.refresh_token ? String(data.refresh_token) : undefined,
+        expiresAt: new Date(Date.now() + expiresInSec * 1000),
+        idToken: data.id_token ? String(data.id_token) : undefined,
+      };
+    } catch (err: any) {
+      if (err instanceof UnauthorizedException || err instanceof BadRequestException) {
+        throw err;
+      }
+      const errCode = err?.response?.data?.error || err?.message || 'oauth_exchange_failed';
+      this.logger.error(`Falha ao trocar authorization code do Google: ${errCode}`);
+      throw new UnauthorizedException('Não foi possível validar a autorização do Google. Tente novamente.');
+    }
+  }
+
+  async getValidGoogleAccessToken(userId: string): Promise<string | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        googleAccessToken: true,
+        googleRefreshToken: true,
+        googleTokenExpiresAt: true,
+      },
+    });
+
+    if (!user) return null;
+
+    let accessToken: string | null = null;
+    let refreshToken: string | null = null;
+    try {
+      accessToken = this.tokenCrypto.decrypt(user.googleAccessToken);
+      refreshToken = this.tokenCrypto.decrypt(user.googleRefreshToken);
+    } catch (err: any) {
+      this.logger.error(`Falha ao descriptografar token Google do usuário ${userId}: ${err?.message}`);
+      return null;
+    }
+
+    if (accessToken && (accessToken.startsWith('dev_token_') || accessToken.startsWith('AIzaSy'))) {
+      return accessToken;
+    }
+
+    const fiveMinutesMs = 5 * 60 * 1000;
+    const isNearExpiry =
+      !accessToken ||
+      !user.googleTokenExpiresAt ||
+      user.googleTokenExpiresAt.getTime() <= Date.now() + fiveMinutesMs;
+
+    if (!isNearExpiry && accessToken) {
+      return accessToken;
+    }
+
+    if (!refreshToken) {
+      return accessToken;
+    }
+
+    const clientId = this.getGoogleClientId();
+    const clientSecret = this.configService.get<string>('GOOGLE_CLIENT_SECRET');
+    if (!clientId || !clientSecret) {
+      return accessToken;
+    }
+
+    try {
+      const body = new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      });
+
+      const { data } = await axios.post(
+        'https://oauth2.googleapis.com/token',
+        body.toString(),
+        {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          timeout: 10000,
+        },
+      );
+
+      const newAccessToken = String(data.access_token || '');
+      if (!newAccessToken) return accessToken;
+
+      const expiresInSec = Number(data.expires_in) || 3600;
+      const newExpiresAt = new Date(Date.now() + expiresInSec * 1000);
+      const encryptedAccess = this.tokenCrypto.encrypt(newAccessToken);
+      const encryptedRefresh = data.refresh_token
+        ? this.tokenCrypto.encrypt(String(data.refresh_token))
+        : undefined;
+
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          googleAccessToken: encryptedAccess,
+          googleTokenExpiresAt: newExpiresAt,
+          ...(encryptedRefresh ? { googleRefreshToken: encryptedRefresh } : {}),
+        },
+      });
+
+      return newAccessToken;
+    } catch (err: any) {
+      const errCode = err?.response?.data?.error;
+      if (errCode === 'invalid_grant' || err?.response?.status === 400 || err?.response?.status === 401) {
+        this.logger.warn(`Google refresh token revogado/inválido para usuário ${userId} (${errCode}). Limpando vínculo Google.`);
+        await this.prisma.user.update({
+          where: { id: userId },
+          data: {
+            googleAccessToken: null,
+            googleRefreshToken: null,
+            googleTokenExpiresAt: null,
+          },
+        });
+        return null;
+      }
+      this.logger.warn(`Falha transitória ao renovar token Google do usuário ${userId}: ${err?.message}`);
+      return accessToken;
+    }
+  }
 
   private get refreshSecret(): string {
     return (
@@ -154,16 +348,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        phoneNumber: user.phoneNumber,
-        householdId: user.householdId,
-        avatarUrl: user.avatarUrl,
-        googleAccessToken: user.googleAccessToken,
-        sharePrivateExpenses: user.sharePrivateExpenses,
-      },
+      user: this.serializeAuthUser(user),
     };
   }
 
@@ -234,15 +419,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        phoneNumber: user.phoneNumber,
-        householdId: user.householdId,
-        avatarUrl: user.avatarUrl,
-        googleAccessToken: user.googleAccessToken,
-      },
+      user: this.serializeAuthUser(user),
     };
   }
 
@@ -279,15 +456,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        phoneNumber: user.phoneNumber,
-        householdId: user.householdId,
-        avatarUrl: user.avatarUrl,
-        googleAccessToken: user.googleAccessToken,
-      },
+      user: this.serializeAuthUser(user),
     };
   }
 
@@ -393,7 +562,28 @@ export class AuthService {
   }
 
   async googleAuth(rawDto: GoogleAuthDto) {
-    const dto = await this.verifyGoogleToken(rawDto.accessToken);
+    let rawAccessToken = rawDto.accessToken;
+    let rawRefreshToken: string | undefined;
+    let tokenExpiresAt: Date | undefined;
+    let tokenForVerification: string | undefined = rawDto.accessToken;
+
+    if (rawDto.code) {
+      const exchanged = await this.exchangeGoogleAuthCode({
+        code: rawDto.code,
+        codeVerifier: rawDto.codeVerifier,
+        redirectUri: rawDto.redirectUri,
+      });
+      rawAccessToken = exchanged.accessToken;
+      rawRefreshToken = exchanged.refreshToken;
+      tokenExpiresAt = exchanged.expiresAt;
+      tokenForVerification = exchanged.idToken || exchanged.accessToken;
+    }
+
+    if (!tokenForVerification || !rawAccessToken) {
+      throw new BadRequestException('Código de autorização ou token do Google obrigatório.');
+    }
+
+    const dto = await this.verifyGoogleToken(tokenForVerification);
     const email = dto.email;
     let user = await this.prisma.user.findFirst({
       where: {
@@ -401,12 +591,18 @@ export class AuthService {
       },
     });
 
+    const encryptedAccess = this.tokenCrypto.encrypt(rawAccessToken);
+    const encryptedRefresh = rawRefreshToken ? this.tokenCrypto.encrypt(rawRefreshToken) : undefined;
+    const expiresAt = tokenExpiresAt || new Date(Date.now() + 55 * 60 * 1000);
+
     if (user) {
       user = await this.prisma.user.update({
         where: { id: user.id },
         data: {
           googleId: dto.googleId,
-          googleAccessToken: rawDto.accessToken,
+          googleAccessToken: encryptedAccess,
+          ...(encryptedRefresh ? { googleRefreshToken: encryptedRefresh } : {}),
+          googleTokenExpiresAt: expiresAt,
           avatarUrl: dto.avatarUrl || user.avatarUrl,
         },
       });
@@ -416,7 +612,9 @@ export class AuthService {
           email,
           name: dto.name,
           googleId: dto.googleId,
-          googleAccessToken: rawDto.accessToken,
+          googleAccessToken: encryptedAccess,
+          googleRefreshToken: encryptedRefresh || null,
+          googleTokenExpiresAt: expiresAt,
           avatarUrl: dto.avatarUrl,
         },
       });
@@ -436,15 +634,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        phoneNumber: user.phoneNumber,
-        householdId: user.householdId,
-        avatarUrl: user.avatarUrl,
-        googleAccessToken: user.googleAccessToken,
-      },
+      user: this.serializeAuthUser(user),
     };
   }
 
@@ -532,6 +722,7 @@ export class AuthService {
         timezone: true,
         expoPushToken: true,
         googleAccessToken: true,
+        googleRefreshToken: true,
         sharePrivateExpenses: true,
         household: {
           select: {
@@ -557,13 +748,41 @@ export class AuthService {
       throw new NotFoundException('Usuário não encontrado');
     }
 
-    return user;
+    const { googleAccessToken, googleRefreshToken, ...safeUser } = user;
+    return {
+      ...safeUser,
+      hasGoogleConnected: Boolean(googleAccessToken || googleRefreshToken),
+    };
   }
 
   async updateProfile(
     userId: string,
     data: UpdateProfileDto,
   ) {
+    let encryptedGoogleAccess: string | null | undefined;
+    let encryptedGoogleRefresh: string | null | undefined;
+    let googleTokenExpiresAt: Date | undefined;
+
+    if (data.googleAuthCode) {
+      const exchanged = await this.exchangeGoogleAuthCode({
+        code: data.googleAuthCode,
+        codeVerifier: data.googleCodeVerifier,
+        redirectUri: data.googleRedirectUri,
+      });
+      encryptedGoogleAccess = this.tokenCrypto.encrypt(exchanged.accessToken);
+      if (exchanged.refreshToken) {
+        encryptedGoogleRefresh = this.tokenCrypto.encrypt(exchanged.refreshToken);
+      }
+      googleTokenExpiresAt = exchanged.expiresAt;
+    } else if (data.googleAccessToken !== undefined) {
+      encryptedGoogleAccess = data.googleAccessToken
+        ? this.tokenCrypto.encrypt(data.googleAccessToken)
+        : null;
+      if (data.googleAccessToken) {
+        googleTokenExpiresAt = new Date(Date.now() + 55 * 60 * 1000);
+      }
+    }
+
     const updated = await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -577,7 +796,9 @@ export class AuthService {
         ...(data.periodicSummaryTime !== undefined && { periodicSummaryTime: data.periodicSummaryTime }),
         ...(data.timezone !== undefined && { timezone: data.timezone }),
         ...(data.expoPushToken !== undefined && { expoPushToken: data.expoPushToken }),
-        ...(data.googleAccessToken !== undefined && { googleAccessToken: data.googleAccessToken }),
+        ...(encryptedGoogleAccess !== undefined && { googleAccessToken: encryptedGoogleAccess }),
+        ...(encryptedGoogleRefresh !== undefined && { googleRefreshToken: encryptedGoogleRefresh }),
+        ...(googleTokenExpiresAt !== undefined && { googleTokenExpiresAt }),
         ...(data.sharePrivateExpenses !== undefined && { sharePrivateExpenses: data.sharePrivateExpenses }),
       },
       select: {
@@ -595,16 +816,24 @@ export class AuthService {
         timezone: true,
         expoPushToken: true,
         googleAccessToken: true,
+        googleRefreshToken: true,
         sharePrivateExpenses: true,
       },
     });
-    if (data.googleAccessToken !== undefined && updated.householdId) {
+    if (encryptedGoogleAccess !== undefined && updated.householdId) {
       await this.prisma.household.update({
         where: { id: updated.householdId },
-        data: { googleAccessToken: data.googleAccessToken },
+        data: {
+          googleAccessToken: encryptedGoogleAccess,
+          ...(encryptedGoogleRefresh !== undefined ? { googleRefreshToken: encryptedGoogleRefresh } : {}),
+        },
       }).catch(() => {});
     }
-    return updated;
+    const { googleAccessToken, googleRefreshToken, ...safeUpdated } = updated;
+    return {
+      ...safeUpdated,
+      hasGoogleConnected: Boolean(googleAccessToken || googleRefreshToken),
+    };
   }
 
   async updatePhoneNumber(userId: string, phoneNumber: string) {

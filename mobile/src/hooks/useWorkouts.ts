@@ -17,9 +17,11 @@ export function useWorkouts() {
 
   const createWorkoutMutation = useMutation({
     mutationFn: (dto: CreateWorkoutDto) => workoutsService.createWorkout(dto),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.workouts.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.workouts.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all }),
+      ]);
     },
   });
 

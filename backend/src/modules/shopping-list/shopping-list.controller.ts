@@ -70,16 +70,20 @@ export class ShoppingListController {
   }
 
   @Patch(':id/toggle')
-  async toggleComplete(@Param('id') id: string) {
-    return this.service.toggleComplete(id);
+  async toggleComplete(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.service.toggleComplete(userId, id);
   }
 
   @Put(':id')
   async update(
+    @CurrentUser('userId') userId: string,
     @Param('id') id: string,
     @Body() dto: UpdateShoppingItemDto,
   ) {
-    return this.service.update(id, dto);
+    return this.service.update(userId, id, dto);
   }
 
   @Delete('completed')
@@ -88,7 +92,10 @@ export class ShoppingListController {
   }
 
   @Delete(':id')
-  async delete(@Param('id') id: string) {
-    return this.service.delete(id);
+  async delete(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.service.delete(userId, id);
   }
 }

@@ -23,7 +23,13 @@ export function useGoogleSignIn() {
   const [showConfigModal, setShowConfigModal] = useState(false);
 
   const [request, response, promptAsync] = Google.useAuthRequest({
-    responseType: ResponseType.Token,
+    responseType: ResponseType.Code,
+    shouldAutoExchangeCode: false,
+    usePKCE: true,
+    extraParams: {
+      access_type: 'offline',
+      prompt: 'consent',
+    },
     webClientId: WEB_ID || 'not-configured',
     iosClientId: IOS_ID || WEB_ID || 'not-configured',
     androidClientId: ANDROID_ID || WEB_ID || 'not-configured',
@@ -40,16 +46,26 @@ export function useGoogleSignIn() {
   useEffect(() => {
     if (!response) return;
     if (response.type === 'success') {
+      const code = response.params?.code;
       const accessToken =
         response.authentication?.accessToken ||
         response.params?.access_token ||
         (response as any).params?.id_token;
 
-      if (!accessToken) {
-        setError('Não foi possível obter o token do Google.');
+      if (!code && !accessToken) {
+        setError('Não foi possível obter a autorização do Google.');
         return;
       }
-      loginWithGoogle({ accessToken }).catch((err: any) => {
+
+      const payload = code
+        ? {
+            code,
+            codeVerifier: request?.codeVerifier,
+            redirectUri: request?.redirectUri,
+          }
+        : { accessToken };
+
+      loginWithGoogle(payload).catch((err: any) => {
         const msg = err?.response?.data?.message || err?.message;
         setError(Array.isArray(msg) ? msg[0] : msg || 'Falha ao autenticar com o Google.');
       });

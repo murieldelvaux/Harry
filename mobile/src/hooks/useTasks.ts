@@ -19,8 +19,11 @@ export function useTasks() {
       const { data } = await apiClient.post<TaskDto>('/tasks', dto);
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
+    onSuccess: async (created) => {
+      queryClient.setQueryData<TaskDto[]>(queryKeys.tasks.list(), (old) =>
+        old ? [created, ...old.filter((t) => t.id !== created.id)] : [created],
+      );
+      await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
     },
   });
 
@@ -29,8 +32,8 @@ export function useTasks() {
       const { data } = await apiClient.put<TaskDto>(`/tasks/${id}/toggle`);
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
     },
   });
 
@@ -39,8 +42,8 @@ export function useTasks() {
       const { data } = await apiClient.patch<TaskDto>(`/tasks/${id}`, dto);
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
     },
   });
 

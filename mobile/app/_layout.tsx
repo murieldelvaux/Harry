@@ -24,12 +24,23 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     queryFn: async () => {
       try {
         return await authService.getMe();
-      } catch {
-        return null;
+      } catch (err: any) {
+        const status = err?.response?.status;
+        if (status === 401 || status === 403) {
+          return null;
+        }
+        // Em erro transitório (rede/timeout/5xx), propaga para acionar retry controlado sem deslogar
+        throw err;
       }
     },
     staleTime: 1000 * 60 * 5,
-    retry: false,
+    retry: (failureCount, err: any) => {
+      const status = err?.response?.status;
+      if (status === 401 || status === 403) return false;
+      return failureCount < 2;
+    },
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
+    refetchOnWindowFocus: false,
   });
 
   // Ativa sincronização instantânea em tempo real via Server-Sent Events (SSE)

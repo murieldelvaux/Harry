@@ -50,6 +50,30 @@ test.describe('Lista de Compras (Shopping List)', () => {
     }
   });
 
+  test('deve manter o item visível ao editar escopo de Privado para Compartilhado', async ({ page }) => {
+    // Alterna seletor rápido para Pessoal e cria um item privado
+    await page.getByText('🏠 Compartilhada').first().click();
+    await expect(page.getByText('🔒 Pessoal').first()).toBeVisible();
+
+    const input = page.getByPlaceholder(/Adicionar item/i);
+    await input.fill('Shampoo Anticaspa');
+    await page.getByText('＋').first().click();
+    await expect(page.getByText('Shampoo Anticaspa').first()).toBeVisible();
+
+    // Abre modal de edição do item criado (primeiro ✏️ da lista)
+    await page.getByText('✏️').first().click();
+    await expect(page.getByText('Editar Item').first()).toBeVisible();
+
+    // Muda destino para Compartilhado e salva
+    await page.getByText('Compartilhado', { exact: true }).last().click();
+    await page.getByText('Salvar Alterações').first().click();
+
+    // Item continua visível em "Todos" e aparece em "🏠 Compartilhado"
+    await expect(page.getByText('Shampoo Anticaspa').first()).toBeVisible();
+    await page.getByText('🏠 Compartilhado').first().click();
+    await expect(page.getByText('Shampoo Anticaspa').first()).toBeVisible();
+  });
+
   test('deve permitir remover um item da lista', async ({ page }) => {
     page.once('dialog', async (dialog) => {
       await dialog.accept();

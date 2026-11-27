@@ -27,6 +27,20 @@ export const ScopeBadge: React.FC<ScopeBadgeProps> = ({ scope, authorName, isPar
     >
       <Text
         style={[
+          styles.icon,
+          {
+            color: isShared
+              ? theme.tagSharedText
+              : isPartnerPrivate
+              ? '#8B5CF6'
+              : theme.tagPrivateText,
+          },
+        ]}
+      >
+        {isShared ? '🏠' : isPartnerPrivate ? '👁️' : '🔒'}
+      </Text>
+      <Text
+        style={[
           styles.text,
           {
             color: isShared
@@ -38,10 +52,10 @@ export const ScopeBadge: React.FC<ScopeBadgeProps> = ({ scope, authorName, isPar
         ]}
       >
         {isShared
-          ? `🏠 Casa ${authorName ? `(${authorName})` : ''}`
+          ? `Casa${authorName ? ` (${authorName})` : ''}`
           : isPartnerPrivate
-          ? `👁️ Pessoal (${authorName || 'Par'})`
-          : '🔒 Pessoal'}
+          ? `Pessoal (${authorName || 'Par'})`
+          : 'Pessoal'}
       </Text>
     </View>
   );
@@ -49,10 +63,16 @@ export const ScopeBadge: React.FC<ScopeBadgeProps> = ({ scope, authorName, isPar
 
 const styles = StyleSheet.create({
   badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
     borderRadius: 8,
     alignSelf: 'flex-start',
+  },
+  icon: {
+    fontSize: 11,
   },
   text: {
     fontSize: 11,

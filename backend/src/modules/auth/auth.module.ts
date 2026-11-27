@@ -6,14 +6,14 @@ import { WhatsappModule } from '../whatsapp/whatsapp.module';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
+import { TokenCryptoService } from '../../common/crypto/token-crypto.service';
 
 @Module({
   imports: [
     WhatsappModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
-      imports: [
-    WhatsappModule,ConfigModule],
+      imports: [WhatsappModule, ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET') || 'nexo-secret-key-fallback',
@@ -24,7 +24,7 @@ import { JwtStrategy } from './jwt.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
-  exports: [AuthService, JwtModule, PassportModule],
+  providers: [AuthService, JwtStrategy, TokenCryptoService],
+  exports: [AuthService, JwtModule, PassportModule, TokenCryptoService],
 })
 export class AuthModule {}

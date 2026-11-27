@@ -61,11 +61,6 @@ export const calendarService = {
     return data;
   },
 
-  async getContext7Anchor(): Promise<{ anchor: string }> {
-    const { data } = await apiClient.get<{ anchor: string }>('/calendar/context7-anchor');
-    return data;
-  },
-
   async triggerDailyBriefing(): Promise<{
     success: boolean;
     message: string;

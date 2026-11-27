@@ -155,6 +155,7 @@ export class NotificationsService {
     deepLink?: string;
     metadata?: Record<string, any>;
     whatsappMessage?: string;
+    skipWhatsapp?: boolean;
   }) {
     try {
       const recipient = await this.prisma.user.findUnique({
@@ -187,7 +188,7 @@ export class NotificationsService {
       const channelsSent: string[] = [];
       if (enableInApp) channelsSent.push('IN_APP');
       if (enablePush && recipient.expoPushToken) channelsSent.push('PUSH');
-      if (enableWhatsapp && recipient.phoneNumber) channelsSent.push('WHATSAPP');
+      if (!params.skipWhatsapp && enableWhatsapp && recipient.phoneNumber) channelsSent.push('WHATSAPP');
 
       let created: any = null;
       if (enableInApp) {
@@ -245,7 +246,7 @@ export class NotificationsService {
       }
 
       // WhatsApp proativo
-      if (enableWhatsapp && recipient.phoneNumber) {
+      if (!params.skipWhatsapp && enableWhatsapp && recipient.phoneNumber) {
         const waText = params.whatsappMessage || `🔔 *${params.title}*\n\n${params.body}`;
         this.whatsappService
           .sendWhatsAppMessage(recipient.phoneNumber, waText)

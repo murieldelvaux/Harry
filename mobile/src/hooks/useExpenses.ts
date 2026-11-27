@@ -38,8 +38,8 @@ export function useExpenses(filters: {
       const { data } = await apiClient.post<ExpenseDto>('/expenses', dto);
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
     },
   });
 
@@ -48,8 +48,8 @@ export function useExpenses(filters: {
       const { data } = await apiClient.patch<ExpenseDto>(`/expenses/${id}`, dto);
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
     },
   });
 

@@ -4,9 +4,10 @@ import { CalendarController } from './calendar.controller';
 import { DailyBriefingService } from './daily-briefing.service';
 import { DatabaseModule } from '../../database/database.module';
 import { WhatsappModule } from '../whatsapp/whatsapp.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [DatabaseModule, WhatsappModule],
+  imports: [DatabaseModule, WhatsappModule, AuthModule],
   controllers: [CalendarController],
   providers: [CalendarService, DailyBriefingService],
   exports: [CalendarService, DailyBriefingService],

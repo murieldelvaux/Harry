@@ -69,6 +69,24 @@ test.describe('Autenticação & Controle de Acesso', () => {
     await expect(page.getByText(/Código de 6 dígitos/i).first()).toBeVisible({ timeout: 7000 });
   });
 
+  test('deve preservar sessão em falha 503 transitória de /auth/me e recuperar no retry', async ({ page }) => {
+    await setupMockApi(page);
+
+    let meAttempts = 0;
+    await page.route('**/api/v1/auth/me', async (route) => {
+      meAttempts += 1;
+      if (meAttempts === 1) {
+        return route.fulfill({ status: 503, json: { message: 'Service Unavailable' } });
+      }
+      return route.fallback();
+    });
+
+    await page.goto('/');
+    await expect(page.getByText(/Nossa Casa|Visão Geral do Lar|Harry/i).first()).toBeVisible({ timeout: 10000 });
+    expect(meAttempts).toBeGreaterThanOrEqual(2);
+    await expect(page).not.toHaveURL(/\/login/);
+  });
+
   test('deve proteger rotas restritas e redirecionar usuário deslogado para o login', async ({ page }) => {
     await setupMockApi(page, { user: null });
     await page.goto('/join');

@@ -35,9 +35,16 @@ export const RefreshTokenDtoSchema = z.object({
 });
 export type RefreshTokenDto = z.infer<typeof RefreshTokenDtoSchema>;
 
-export const GoogleAuthDtoSchema = z.object({
-  accessToken: z.string().min(1, "Token do Google obrigatório"),
-});
+export const GoogleAuthDtoSchema = z
+  .object({
+    accessToken: z.string().min(1).optional(),
+    code: z.string().min(1).optional(),
+    codeVerifier: z.string().min(1).optional(),
+    redirectUri: z.string().min(1).optional(),
+  })
+  .refine((data) => Boolean(data.code || data.accessToken), {
+    message: 'Código de autorização ou token do Google obrigatório',
+  });
 export type GoogleAuthDto = z.infer<typeof GoogleAuthDtoSchema>;
 
 export const ForgotPasswordDtoSchema = z.object({
@@ -64,6 +71,9 @@ export const UpdateProfileDtoSchema = z.object({
   timezone: z.string().optional(),
   expoPushToken: z.string().optional(),
   googleAccessToken: z.string().optional(),
+  googleAuthCode: z.string().optional(),
+  googleCodeVerifier: z.string().optional(),
+  googleRedirectUri: z.string().optional(),
   sharePrivateExpenses: z.boolean().optional(),
 });
 export type UpdateProfileDto = z.infer<typeof UpdateProfileDtoSchema>;
@@ -78,6 +88,7 @@ export interface AuthResponseDto {
     phoneNumber: string | null;
     householdId: string | null;
     avatarUrl?: string | null;
+    hasGoogleConnected?: boolean;
     googleAccessToken?: string | null;
     sharePrivateExpenses?: boolean;
     dailySummaryTime?: string | null;

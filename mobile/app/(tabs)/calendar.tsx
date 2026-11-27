@@ -586,7 +586,7 @@ export default function CalendarScreen() {
                   <ActivityIndicator size="small" color={theme.primary} />
                 ) : (
                   <Text style={[styles.syncBtnText, { color: theme.primary }]}>
-                    🔄 Sincronizar
+                    🔄  Sincronizar
                   </Text>
                 )}
               </TouchableOpacity>
@@ -915,7 +915,7 @@ export default function CalendarScreen() {
                               }}
                             />
                             <Text style={[styles.scopeBadgeText, { color: item.color || '#0369A1', fontWeight: '700' }]}>
-                              {item.googleCalendarId && item.googleCalendarId !== 'primary' ? '👥 Compartilhada' : '🗓️ Google'}
+                              {item.googleCalendarId && item.googleCalendarId !== 'primary' ? '👥  Compartilhada' : '🗓️  Google'}
                             </Text>
                           </View>
                         ) : null}
@@ -940,7 +940,7 @@ export default function CalendarScreen() {
                               },
                             ]}
                           >
-                            {isShared ? '🏠 Compartilhado' : '🔒 Pessoal'}
+                            {isShared ? '🏠  Compartilhado' : '🔒  Pessoal'}
                           </Text>
                         </View>
                       </View>

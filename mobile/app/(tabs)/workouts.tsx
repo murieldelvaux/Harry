@@ -757,8 +757,8 @@ export default function WorkoutsScreen() {
         ]}
       >
         {/* TOPO: STATUS (CONCLUÍDO vs PLANEJADO) + PROVEDOR + TIPO */}
-        <View style={styles.statusRowTop}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <View style={[styles.statusRowTop, { flexWrap: 'wrap', gap: 6 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: 1, minWidth: 160 }}>
             <View
               style={[
                 styles.statusPill,
@@ -1065,7 +1065,7 @@ export default function WorkoutsScreen() {
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.headerRow}>
-          <View>
+          <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={[styles.title, { color: theme.textPrimary }]}>
               Calendário de Treinos & Corridas 💪
             </Text>
@@ -1128,12 +1128,12 @@ export default function WorkoutsScreen() {
                 },
               ]}
             >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 200 }}>
                   <View style={styles.garminBrandBadge}>
                     <Text style={{ fontSize: 20 }}>⌚</Text>
                   </View>
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={{ fontSize: 14.5, fontWeight: '800', color: theme.textPrimary }}>
                       Garmin Connect (Corridas da Semana)
                     </Text>
@@ -1214,15 +1214,17 @@ export default function WorkoutsScreen() {
               <View
                 style={{
                   flexDirection: 'row',
+                  flexWrap: 'wrap',
                   justifyContent: 'space-between',
                   alignItems: 'center',
+                  gap: 8,
                 }}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 200 }}>
                   <View style={styles.stravaBrandBadge}>
                     <Text style={{ fontSize: 20 }}>🟠</Text>
                   </View>
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={{ fontSize: 14.5, fontWeight: '800', color: theme.textPrimary }}>
                       Strava (Corrida & Musculação)
                     </Text>
@@ -1342,15 +1344,15 @@ export default function WorkoutsScreen() {
               </Text>
             </TouchableOpacity>
 
-            <View style={{ alignItems: 'center' }}>
+            <View style={{ flex: 1, minWidth: 0, alignItems: 'center', paddingHorizontal: 8 }}>
               <Text
                 testID="workout-month-label"
-                style={{ fontSize: 17, fontWeight: '800', color: theme.textPrimary }}
+                style={{ fontSize: 16, fontWeight: '800', color: theme.textPrimary, textAlign: 'center' }}
               >
-                📅 {MONTH_NAMES_PT[selectedMonth]} de {selectedYear}
+                📅  {MONTH_NAMES_PT[selectedMonth]} de {selectedYear}
               </Text>
-              <Text style={{ fontSize: 11.5, color: theme.textSecondary, marginTop: 2 }}>
-                ✅ {monthCompletedCount} concluído(s) ({monthCompletedKm} km) • 📅 {monthPlannedCount} planejado(s) ({monthPlannedKm} km)
+              <Text style={{ fontSize: 11.5, color: theme.textSecondary, marginTop: 2, textAlign: 'center' }}>
+                ✅  {monthCompletedCount} concluído(s) ({monthCompletedKm} km) • 📅  {monthPlannedCount} planejado(s) ({monthPlannedKm} km)
               </Text>
             </View>
 
@@ -1395,7 +1397,7 @@ export default function WorkoutsScreen() {
                   color: selectedWeekNumber === 'ALL' ? '#FFFFFF' : theme.textPrimary,
                 }}
               >
-                🗓️ Mês Inteiro ({monthWorkouts.length})
+                🗓️  Mês Inteiro ({monthWorkouts.length})
               </Text>
             </TouchableOpacity>
 
@@ -1467,7 +1469,7 @@ export default function WorkoutsScreen() {
             >
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
                 <Text style={{ fontSize: 12, fontWeight: '800', color: theme.textPrimary }}>
-                  📆 Visão Diária — {activeCalendarWeek.label} ({activeCalendarWeek.rangeLabel})
+                  📆  Visão Diária — {activeCalendarWeek.label} ({activeCalendarWeek.rangeLabel})
                 </Text>
                 {selectedDayKey && (
                   <TouchableOpacity onPress={() => setSelectedDayKey(null)}>
@@ -1565,7 +1567,7 @@ export default function WorkoutsScreen() {
           ]}
         >
           <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-            🔥 Constância Semanal Individual
+            🔥  Constância Semanal Individual
           </Text>
           <Text style={{ fontSize: 12, color: theme.textSecondary, marginTop: -4, marginBottom: 10 }}>
             {activeCalendarWeek
@@ -1606,7 +1608,7 @@ export default function WorkoutsScreen() {
                 }}
               >
                 <Text style={{ fontSize: 14, fontWeight: '800', color: theme.textPrimary }}>
-                  👤 {ic.userName} {ic.isMe ? '(Você)' : ''}
+                  👤  {ic.userName} {ic.isMe ? '(Você)' : ''}
                 </Text>
                 <Text
                   style={{
